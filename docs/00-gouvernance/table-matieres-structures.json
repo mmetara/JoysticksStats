@@ -1,0 +1,118 @@
+{
+    "meta": {
+        "id": "joysticksstats.table-matieres-structures",
+        "version": "1.0.0",
+        "generatedAt": "2026-04-27",
+        "sourceAutorite": "docs/00-gouvernance/contrat-collaboration-ia.md",
+        "ordreLectureDemarrage": [
+            "docs/00-gouvernance/contrat-collaboration-ia.md",
+            "docs/00-gouvernance/table-matieres-structures.json",
+            "README.md",
+            "docs/01-vue-ensemble-solution/cartographie-solution.md",
+            "docs/20-android-kotlin-technique/standards-application-android-kotlin.md"
+        ]
+    },
+    "structures": [
+        {
+            "id": "index-documentaire",
+            "priorite": "P0",
+            "entrees": [
+                {
+                    "path": "README.md",
+                    "role": "Index principal de navigation documentaire"
+                }
+            ]
+        },
+        {
+            "id": "gouvernance",
+            "priorite": "P0",
+            "entrees": [
+                {
+                    "path": "docs/00-gouvernance/contrat-collaboration-ia.md",
+                    "role": "Contrat canonique"
+                },
+                {
+                    "path": "docs/00-gouvernance/demarrage-agent-ia.md",
+                    "role": "Checklist de support"
+                },
+                {
+                    "path": "docs/00-gouvernance/regle-anti-doublons.md",
+                    "role": "Regle canonique anti-doublons"
+                }
+            ]
+        },
+        {
+            "id": "vue-ensemble",
+            "priorite": "P0",
+            "entrees": [
+                {
+                    "path": "docs/01-vue-ensemble-solution/cartographie-solution.md",
+                    "role": "Cartographie globale solution"
+                }
+            ]
+        },
+        {
+            "id": "android-kotlin",
+            "scope": "20",
+            "priorite": "P0-P2",
+            "entrees": [
+                {
+                    "path": "docs/20-android-kotlin-technique/standards-application-android-kotlin.md",
+                    "priorite": "P0"
+                },
+                {
+                    "path": "docs/20-android-kotlin-technique/arborescence-reference-application-android-kotlin.md",
+                    "priorite": "P1"
+                },
+                {
+                    "path": "docs/20-android-kotlin-technique/architecture-de-reference-application-android-kotlin.md",
+                    "priorite": "P1"
+                },
+                {
+                    "path": "docs/20-android-kotlin-technique/liste-verification-implantation-application-android-kotlin.md",
+                    "priorite": "P2"
+                },
+                {
+                    "path": "docs/20-android-kotlin-technique/guide-execution-locale-application-android-kotlin.md",
+                    "priorite": "P2"
+                }
+            ]
+        },
+        {
+            "id": "entree-projet",
+            "priorite": "P2",
+            "entrees": [
+                {
+                    "path": "docs/80-entree-projet/modele-entree-projet.md",
+                    "priorite": "P2"
+                }
+            ]
+        },
+        {
+            "id": "documentation-applicative",
+            "priorite": "P0-P2",
+            "entrees": [
+                {
+                    "path": "docs/10-application/contexte-application.md",
+                    "priorite": "P0"
+                },
+                {
+                    "path": "docs/10-application/specification-fonctionnelle.md",
+                    "priorite": "P0"
+                },
+                {
+                    "path": "docs/10-application/architecture-specifique.md",
+                    "priorite": "P0"
+                },
+                {
+                    "path": "docs/10-application/specifications-fonctionnelles/01-conduite-match.md",
+                    "priorite": "P1"
+                },
+                {
+                    "path": "docs/10-application/specifications-fonctionnelles/02-import-export.md",
+                    "priorite": "P1"
+                }
+            ]
+        }
+    ]
+}

@@ -1,20 +1,38 @@
-# Introduction 
-TODO: Give a short introduction of your project. Let this section explain the objectives or the motivation behind this project. 
+# Base de connaissance - JoysticksStats
 
-# Getting Started
-TODO: Guide users through getting your code up and running on their own system. In this section you can talk about:
-1.	Installation process
-2.	Software dependencies
-3.	Latest releases
-4.	API references
+Utiliser cette arborescence comme index de navigation documentaire; la verite normative unique est portee par `docs/00-gouvernance/contrat-collaboration-ia.md`.
 
-# Build and Test
-TODO: Describe and show how to build your code and run the tests. 
+## Demarrage rapide agent IA
 
-# Contribute
-TODO: Explain how other users and developers can contribute to make your code better. 
+1. Lire `docs/00-gouvernance/contrat-collaboration-ia.md` en entier.
+2. Lire `docs/00-gouvernance/table-matieres-structures.json`.
+3. Lire `AGENTS.md` comme guide d'execution agent.
+4. Lire `docs/01-vue-ensemble-solution/cartographie-solution.md`.
+5. Ouvrir les standards du scope Android:
+   - `docs/20-android-kotlin-technique/standards-application-android-kotlin.md`
 
-If you want to learn more about creating good readme files then refer the following [guidelines](https://docs.microsoft.com/en-us/azure/devops/repos/git/create-a-readme?view=azure-devops). You can also seek inspiration from the below readme files:
-- [ASP.NET Core](https://github.com/aspnet/Home)
-- [Visual Studio Code](https://github.com/Microsoft/vscode)
-- [Chakra Core](https://github.com/Microsoft/ChakraCore)
+## Structure
+
+- `docs/00-gouvernance/`: contrat, checklist, table de routage.
+- `docs/01-vue-ensemble-solution/`: cartographie globale.
+- `docs/10-application/`: documentation fonctionnelle metier (quoi/pourquoi).
+- `docs/20-android-kotlin-technique/`: documentation technique Android/Kotlin (comment).
+- `docs/80-entree-projet/`: modele d'entree projet.
+
+Regle anti-doublons: `docs/00-gouvernance/regle-anti-doublons.md`.
+
+## Documentation applicative
+
+- `docs/10-application/contexte-application.md`
+- `docs/10-application/specification-fonctionnelle.md`
+- `docs/10-application/architecture-specifique.md`
+
+## Execution locale
+
+1. Provision macOS: `./install.sh`
+2. Build + emulateur + install + run: `./run_all.sh`
+
+## Build manuel
+
+- `./gradlew clean :app:assembleDebug`
+- `./gradlew :app:installDebug`
