@@ -14,6 +14,7 @@ Fournir un cadre documentaire stable, actionnable et versionne pour guider les e
 ## Regles de documentation
 
 - Source de verite unique par sujet.
+- Avant toute reponse de process (socle, methode, workflow), l'agent lit les documents obligatoires du demarrage projet.
 - Toute modification code impactant le comportement metier met a jour la documentation dans le meme changement.
 - Interdiction de dupliquer un meme contenu sur plusieurs fichiers. En cas de recouvrement, conserver une seule source canonique et remplacer ailleurs par un renvoi.
 - Le decoupage documentaire suit la structure:
@@ -25,6 +26,17 @@ Fournir un cadre documentaire stable, actionnable et versionne pour guider les e
 - La regle d'application anti-doublons est definie dans `docs/00-gouvernance/regle-anti-doublons.md`.
 - Le fichier `docs/10-application/specification-fonctionnelle.md` est obligatoire et sert d'index vers les specifications detaillees.
 - Les specifications detaillees vivent dans `docs/10-application/specifications-fonctionnelles/*.md`.
+
+## Demarrage agent obligatoire
+
+Avant toute reponse de process, l'agent doit lire dans cet ordre:
+
+1. `docs/00-gouvernance/contrat-collaboration-ia.md`
+2. `docs/00-gouvernance/table-matieres-structures.json`
+3. `README.md`
+4. `docs/01-vue-ensemble-solution/cartographie-solution.md`
+5. `docs/20-android-kotlin-technique/standards-application-android-kotlin.md`
+6. `docs/10-application/specification-fonctionnelle.md`
 
 ## Regles d'implementation
 

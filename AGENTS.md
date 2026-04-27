@@ -11,6 +11,11 @@ Ce fichier definit le decoupage operatoire par niveaux pour les agents qui trava
 5. `docs/20-android-kotlin-technique/standards-application-android-kotlin.md`
 6. `docs/10-application/specification-fonctionnelle.md`
 
+Regle d'application immediate:
+
+- Avant toute reponse de process (socle, methode, workflow), effectuer cette lecture complete d'abord.
+- La regle canonique de gouvernance est maintenue dans `docs/00-gouvernance/contrat-collaboration-ia.md`.
+
 ## 1. Niveaux d'architecture
 
 ### Niveau 0 - Plateforme
