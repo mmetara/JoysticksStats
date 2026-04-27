@@ -29,8 +29,8 @@ Regle anti-doublons: `docs/00-gouvernance/regle-anti-doublons.md`.
 
 ## Execution locale
 
-1. Provision macOS: `./install.sh`
-2. Build + emulateur + install + run: `./run_all.sh`
+1. Provision macOS: `./scripts/install.sh`
+2. Build + emulateur + install + run: `./scripts/run_all.sh`
 
 ## Build manuel
 

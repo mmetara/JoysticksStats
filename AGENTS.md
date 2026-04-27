@@ -23,8 +23,8 @@ Perimetre:
 - build.gradle.kts
 - gradle/libs.versions.toml
 - app/build.gradle.kts
-- install.sh
-- run_all.sh
+- scripts/install.sh
+- scripts/run_all.sh
 
 Sorties attendues:
 

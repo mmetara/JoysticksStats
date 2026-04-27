@@ -10,7 +10,7 @@ Composants principaux:
 - Moteur metier de match (`app/src/main/java/com/joysticks/stats/engine/`)
 - Couche ecrans Compose (`app/src/main/java/com/joysticks/stats/ui/screens/`)
 - Adaptateurs data et sorties (`data/`, `utils/`)
-- Scripts execution locale (`install.sh`, `run_all.sh`)
+- Scripts execution locale (`scripts/install.sh`, `scripts/run_all.sh`)
 
 ## Decoupage operatoire par niveaux
 

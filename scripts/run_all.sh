@@ -1,7 +1,18 @@
 #!/usr/bin/env sh
 set -eu
 
-PROJECT_DIR=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
+SCRIPT_DIR=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
+PROJECT_DIR="$SCRIPT_DIR"
+
+while [ "$PROJECT_DIR" != "/" ] && [ ! -f "$PROJECT_DIR/gradlew" ]; do
+  PROJECT_DIR=$(dirname "$PROJECT_DIR")
+done
+
+if [ ! -f "$PROJECT_DIR/gradlew" ]; then
+  echo "Unable to locate project root (gradlew not found)."
+  exit 1
+fi
+
 cd "$PROJECT_DIR"
 
 OS_NAME="$(uname -s)"
@@ -239,7 +250,53 @@ choose_target_serial() {
   adb devices | awk 'NR>1 && $2=="device" {print $1; exit}'
 }
 
+choose_emulator_serial() {
+  if ! command -v adb >/dev/null 2>&1; then
+    return
+  fi
+
+  adb devices | awk 'NR>1 && $2=="device" && $1 ~ /^emulator-/ {print $1; exit}'
+}
+
+wait_for_android_ready() {
+  TARGET_SERIAL="$1"
+
+  echo "Waiting for device connection: $TARGET_SERIAL"
+  adb -s "$TARGET_SERIAL" wait-for-device
+
+  echo "Waiting for Android boot completion on $TARGET_SERIAL..."
+  boot_ok="0"
+  attempts=0
+  while [ "$boot_ok" != "1" ] && [ "$attempts" -lt 180 ]; do
+    sys_boot_completed="$(adb -s "$TARGET_SERIAL" shell getprop sys.boot_completed 2>/dev/null | tr -d '\r')"
+    dev_boot_completed="$(adb -s "$TARGET_SERIAL" shell getprop dev.bootcomplete 2>/dev/null | tr -d '\r')"
+    boot_anim="$(adb -s "$TARGET_SERIAL" shell getprop init.svc.bootanim 2>/dev/null | tr -d '\r')"
+
+    if [ "$sys_boot_completed" = "1" ] && [ "$dev_boot_completed" = "1" ] && [ "$boot_anim" = "stopped" ]; then
+      boot_ok="1"
+      break
+    fi
+
+    attempts=$((attempts + 1))
+    sleep 2
+  done
+
+  if [ "$boot_ok" != "1" ]; then
+    echo "Android did not fully boot in time on $TARGET_SERIAL. See /tmp/joysticks-emulator.log"
+    exit 1
+  fi
+
+  # Unlock once to ensure taps are accepted when the app launches.
+  adb -s "$TARGET_SERIAL" shell input keyevent 82 >/dev/null 2>&1 || true
+}
+
 ensure_emulator_running() {
+  EXISTING_EMU_SERIAL="$(choose_emulator_serial || true)"
+  if [ -n "$EXISTING_EMU_SERIAL" ]; then
+    wait_for_android_ready "$EXISTING_EMU_SERIAL"
+    return
+  fi
+
   if [ "$(device_count)" -gt 0 ]; then
     return
   fi
@@ -263,50 +320,35 @@ ensure_emulator_running() {
   nohup "$EMULATOR_PATH" -avd "$AVD_NAME" -no-boot-anim -no-snapshot-save >/tmp/joysticks-emulator.log 2>&1 &
 
   echo "Waiting for emulator to connect..."
-  connected="0"
+  connected_serial=""
   connect_attempts=0
-  while [ "$connected" = "0" ] && [ "$connect_attempts" -lt 120 ]; do
-    if [ "$(device_count)" -gt 0 ]; then
-      connected="1"
+  while [ -z "$connected_serial" ] && [ "$connect_attempts" -lt 180 ]; do
+    connected_serial="$(choose_emulator_serial || true)"
+    if [ -n "$connected_serial" ]; then
       break
     fi
     connect_attempts=$((connect_attempts + 1))
     sleep 2
   done
 
-  if [ "$connected" != "1" ]; then
+  if [ -z "$connected_serial" ]; then
     echo "Emulator did not connect in time. See /tmp/joysticks-emulator.log"
     exit 1
   fi
 
-  echo "Waiting for Android boot to complete..."
-  boot_completed="0"
-  attempts=0
-  while [ "$boot_completed" != "1" ] && [ "$attempts" -lt 120 ]; do
-    boot_completed="$(adb shell getprop sys.boot_completed 2>/dev/null | tr -d '\r')"
-    if [ "$boot_completed" = "1" ]; then
-      break
-    fi
-    attempts=$((attempts + 1))
-    sleep 2
-  done
-
-  if [ "$boot_completed" != "1" ]; then
-    echo "Emulator did not boot in time. See /tmp/joysticks-emulator.log"
-    exit 1
-  fi
-
-  adb shell input keyevent 82 >/dev/null 2>&1 || true
+  wait_for_android_ready "$connected_serial"
 }
-
-if [ ! -f "./gradlew" ]; then
-  echo "gradlew not found. Run this script from the project root."
-  exit 1
-fi
 
 chmod +x ./gradlew
 ensure_java
 ensure_android_sdk
+ensure_emulator_running
+
+TARGET_SERIAL="$(choose_target_serial || true)"
+if [ -n "$TARGET_SERIAL" ]; then
+  export ANDROID_SERIAL="$TARGET_SERIAL"
+  echo "Using target device: $ANDROID_SERIAL"
+fi
 
 echo "Preparing clean build state..."
 ./gradlew --stop >/dev/null 2>&1 || true
@@ -315,16 +357,9 @@ rm -rf ./app/build/intermediates/project_dex_archive ./app/build/intermediates/d
 echo "Building debug APK (clean)..."
 ./gradlew clean :app:assembleDebug
 
-ensure_emulator_running
 DEVICE_COUNT=$(device_count)
 
 if [ "$DEVICE_COUNT" -gt 0 ]; then
-  TARGET_SERIAL="$(choose_target_serial)"
-  if [ -n "$TARGET_SERIAL" ]; then
-    export ANDROID_SERIAL="$TARGET_SERIAL"
-    echo "Using target device: $ANDROID_SERIAL"
-  fi
-
   echo "Installing debug APK on connected device/emulator..."
   ./gradlew :app:installDebug
 

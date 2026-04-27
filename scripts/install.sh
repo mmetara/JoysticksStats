@@ -1,7 +1,18 @@
 #!/usr/bin/env sh
 set -eu
 
-PROJECT_DIR=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
+SCRIPT_DIR=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
+PROJECT_DIR="$SCRIPT_DIR"
+
+while [ "$PROJECT_DIR" != "/" ] && [ ! -f "$PROJECT_DIR/gradlew" ]; do
+  PROJECT_DIR=$(dirname "$PROJECT_DIR")
+done
+
+if [ ! -f "$PROJECT_DIR/gradlew" ]; then
+  echo "Unable to locate project root (gradlew not found)."
+  exit 1
+fi
+
 cd "$PROJECT_DIR"
 
 ensure_brew_in_path() {
@@ -115,5 +126,5 @@ Installation finished.
 
 Recommended next steps:
 1) Restart your terminal (or run: source ~/.zprofile).
-2) Run: ./run_all.sh
+2) Run: ./scripts/run_all.sh
 MSG
