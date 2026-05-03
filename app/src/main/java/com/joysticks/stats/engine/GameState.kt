@@ -27,6 +27,7 @@ data class GameState(
 
     val runsThisHalfInning: Int = 0, // Points marqués dans la demi-manche actuelle
     val maxRunsReached: Boolean = false, // Indique si la limite de points est atteinte
+    val threeOutsReached: Boolean = false, // Indique si 3 retraits sont atteints
 
     // Nouveaux champs pour la limite de circuits et la 9e manche
     val homeTeamHomeRuns: Int = 0,
@@ -58,7 +59,9 @@ data class AtBatEvent(
     val finalBase: Int, // 0: Out, 1: 1B, 2: 2B, 3: 3B, 4: Marbre
     val isHomeTeam: Boolean,
     val rbi: Int = 0, // Points produits
-    val retiredOnOptionel: Boolean = false // Indique si un coureur a été retiré sur optionnel lors de cet événement
+    val retiredOnOptionel: Boolean = false, // Indique si un coureur a été retiré sur optionnel lors de cet événement
+    val outNumber: Int = 0, // Le numéro du retrait (1, 2 ou 3) si cet événement a causé un retrait
+    val isLastOfInning: Boolean = false // Indique si cet événement est le dernier de la demi-manche
 )
 
 data class AtBatRecord(

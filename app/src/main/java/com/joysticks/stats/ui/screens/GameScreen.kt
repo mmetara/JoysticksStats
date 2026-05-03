@@ -1,11 +1,17 @@
 package com.joysticks.stats.ui.screens
 
+import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.buildAnnotatedString
+import androidx.compose.ui.text.withStyle
+import androidx.compose.foundation.layout.widthIn
+import androidx.compose.ui.text.style.TextAlign
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -29,8 +35,10 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.navigation.NavController
 import com.joysticks.stats.engine.GameScreenMode
+import com.joysticks.stats.ui.navigation.Screen
 import com.joysticks.stats.engine.GameViewModel
 import com.joysticks.stats.engine.parseRoster
 import com.joysticks.stats.ui.components.HudButton
@@ -40,6 +48,7 @@ import com.joysticks.stats.ui.theme.ChalkWhite
 import com.joysticks.stats.ui.theme.FieldGreen
 import com.joysticks.stats.ui.theme.HudBlue
 import com.joysticks.stats.ui.theme.HudOrange
+import com.joysticks.stats.ui.theme.HudRed
 import com.joysticks.stats.utils.getCountdownText
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -51,6 +60,7 @@ fun GameScreen(
     onNavigateToHome: () -> Unit,
     onNavigateToStatsSheet: () -> Unit,
     onExportPdf: () -> Unit,
+    onUploadCsv: () -> Unit,
     editEventPlayerIndex: Int = -1,
     editEventInning: Int = -1,
     editEventIsHomeTeam: Boolean = false
@@ -129,38 +139,8 @@ fun GameScreen(
 
                 Box(modifier = Modifier.fillMaxSize()) {
 
-                    if (state.maxRunsReached) {
-                        Column(
-                            modifier = Modifier
-                                .fillMaxSize()
-                                .background(Color.Black.copy(alpha = 0.5f)),
-                            verticalArrangement = Arrangement.Center,
-                            horizontalAlignment = Alignment.CenterHorizontally
-                        ) {
-                            Row(
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.Center,
-                                modifier = Modifier.padding(16.dp)
-                            ) {
-                                Text(
-                                    text = "Limite de 3 points atteinte.",
-                                    style = MaterialTheme.typography.headlineSmall,
-                                    color = Color.White,
-                                    fontWeight = FontWeight.Bold,
-                                    modifier = Modifier.padding(end = 8.dp)
-                                )
-                                HudButton(
-                                    text = "Ok",
-                                    onClick = { gameViewModel.forceEndHalfInningFromUI() }
-                                )
-                            }
-                        }
-                    }
-
                     when (state.screenMode) {
-
                         GameScreenMode.PRE_GAME -> {
-
                             Column(
                                 horizontalAlignment = Alignment.CenterHorizontally,
                                 verticalArrangement = Arrangement.Center,
@@ -169,29 +149,34 @@ fun GameScreen(
                                     .verticalScroll(rememberScrollState())
                                     .padding(16.dp)
                             ) {
-
                                 LineupScreen(roster)
-
-                                Spacer(Modifier.height(20.dp))
-
-                                HudPanel {
-                                    Row(
-                                        horizontalArrangement = Arrangement.Center,
-                                        verticalAlignment = Alignment.CenterVertically,
-                                        modifier = Modifier.fillMaxWidth()
-                                    ) {
-                                        Text("Début du match dans : ", color = ChalkWhite)
-
-                                        Text(
-                                            text = getCountdownText(gameStart, now),
-                                            fontWeight = FontWeight.Bold,
-                                            color = FieldGreen
-                                        )
+                                Spacer(Modifier.height(8.dp))
+                                HudPanel(contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp)) {
+                                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                        val annotatedGameInfo = buildAnnotatedString {
+                                            append("Partie du : ")
+                                            withStyle(style = SpanStyle(color = FieldGreen, fontWeight = FontWeight.Bold)) {
+                                                append(roster.gameInfo.gameDate)
+                                                append(" à ")
+                                                append(roster.gameInfo.gameTime)
+                                            }
+                                            append(". Début du match dans : ")
+                                        }
+                                        Row(
+                                            horizontalArrangement = Arrangement.Center,
+                                            verticalAlignment = Alignment.CenterVertically
+                                        ) {
+                                            Text(text = annotatedGameInfo, color = ChalkWhite, fontSize = 14.sp)
+                                            Text(
+                                                text = getCountdownText(gameStart, now),
+                                                fontWeight = FontWeight.Bold,
+                                                color = FieldGreen,
+                                                fontSize = 14.sp
+                                            )
+                                        }
                                     }
                                 }
-
-                                Spacer(Modifier.height(20.dp))
-
+                                Spacer(Modifier.height(10.dp))
                                 HudButton(
                                     text = "Play Ball",
                                     onClick = { gameViewModel.startGame() },
@@ -199,7 +184,6 @@ fun GameScreen(
                                 )
                             }
                         }
-
                         GameScreenMode.OPPONENT_SCORING -> {
                             OpponentScorePanel( gameState = state,
                                 onScoreEntered = {  runs ->
@@ -207,9 +191,7 @@ fun GameScreen(
                                 }
                             )
                         }
-
                         GameScreenMode.BATTING -> {
-
                             BattingPanel(
                                 state = state,
                                 onAction = { result ->
@@ -228,12 +210,12 @@ fun GameScreen(
                                 editEventIsHomeTeam = editEventIsHomeTeam,
                                 onSaveEdit = { editedEvent ->
                                     gameViewModel.editAtBatEvent(editedEvent)
-                                    navController.popBackStack() // Go back to StatsSheetScreen
-                                    navController.navigate("statsSheet") // Re-navigate to refresh stats
+                                    navController.popBackStack()
+                                    navController.navigate(Screen.StatsSheet.route)
                                 },
                                 onCancelEdit = {
-                                    navController.popBackStack() // Go back to StatsSheetScreen
-                                    navController.navigate("statsSheet") // Re-navigate to refresh stats
+                                    navController.popBackStack()
+                                    navController.navigate(Screen.StatsSheet.route)
                                 }
                             )
                         }
@@ -244,12 +226,47 @@ fun GameScreen(
                                     gameViewModel.resetGame()
                                 },
                                 onExportCsv = { createDocumentLauncher.launch("game_stats.txt") },
-                                onExportPdf = onExportPdf
+                                onExportPdf = onExportPdf,
+                                onUploadCsv = onUploadCsv
                             )
                         }
                     }
 
-                    if (state.screenMode != GameScreenMode.PRE_GAME && state.screenMode != GameScreenMode.BATTING) {
+                    if (state.maxRunsReached || state.threeOutsReached) {
+                        Box(
+                            modifier = Modifier
+                                .align(Alignment.BottomEnd)
+                                .padding(24.dp)
+                        ) {
+                            HudPanel(
+                                modifier = Modifier.widthIn(max = 300.dp),
+                                borderColor = if (state.threeOutsReached) HudRed else HudOrange
+                            ) {
+                                Column(
+                                    horizontalAlignment = Alignment.CenterHorizontally,
+                                    modifier = Modifier.padding(12.dp)
+                                ) {
+                                    Text(
+                                        text = if (state.threeOutsReached) "3 RETRAITS" else "LIMITE 3 PTS",
+                                        style = MaterialTheme.typography.labelLarge,
+                                        color = if (state.threeOutsReached) HudRed else HudOrange,
+                                        fontWeight = FontWeight.Black
+                                    )
+                                    Spacer(Modifier.height(12.dp))
+                                    HudButton(
+                                        text = "FINIR MANCHE",
+                                        onClick = { gameViewModel.forceEndHalfInningFromUI() },
+                                        accent = if (state.threeOutsReached) HudRed else HudOrange,
+                                        modifier = Modifier.fillMaxWidth()
+                                    )
+                                }
+                            }
+                        }
+                    }
+
+                    if (state.screenMode != GameScreenMode.PRE_GAME && 
+                        state.screenMode != GameScreenMode.BATTING && 
+                        state.screenMode != GameScreenMode.GAME_OVER) {
                         Scoreboard(
                             state = state,
                             roster = roster,
@@ -266,44 +283,75 @@ fun GameScreen(
 }
 
 @Composable
-fun GameOverPanel(state: com.joysticks.stats.engine.GameState, onNewGame: () -> Unit, onExportCsv: () -> Unit, onExportPdf: () -> Unit) {
+fun GameOverPanel(
+    state: com.joysticks.stats.engine.GameState,
+    onNewGame: () -> Unit,
+    onExportCsv: () -> Unit,
+    onExportPdf: () -> Unit,
+    onUploadCsv: () -> Unit
+) {
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .background(Color.Black.copy(alpha = 0.7f)),
+            .background(Color.Black.copy(alpha = 0.85f)),
         verticalArrangement = Arrangement.Center,
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        HudPanel(modifier = Modifier.padding(24.dp)) {
-            Text(
-                text = "PARTIE TERMINÉE",
-                style = MaterialTheme.typography.headlineLarge,
-                color = ChalkWhite,
-                fontWeight = FontWeight.Black,
-                modifier = Modifier.padding(bottom = 16.dp)
-            )
-            Text(
-                text = "Score final: ${state.homeScore} - ${state.awayScore}",
-                style = MaterialTheme.typography.headlineMedium,
-                color = FieldGreen,
-                modifier = Modifier.padding(bottom = 24.dp)
-            )
-            HudButton(
-                text = "Exporter les statistiques CSV",
-                onClick = onExportCsv,
-                modifier = Modifier.padding(bottom = 8.dp)
-            )
-            HudButton(
-                text = "Exporter en PDF",
-                onClick = onExportPdf,
-                accent = HudBlue,
-                modifier = Modifier.padding(bottom = 8.dp)
-            )
-            HudButton(
-                text = "Nouvelle partie",
-                onClick = onNewGame,
-                accent = HudOrange
-            )
+        HudPanel(
+            modifier = Modifier
+                .padding(24.dp)
+                .widthIn(min = 320.dp, max = 440.dp)
+        ) {
+            Column(
+                horizontalAlignment = Alignment.CenterHorizontally,
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Text(
+                    text = "PARTIE TERMINÉE",
+                    style = MaterialTheme.typography.headlineLarge,
+                    color = ChalkWhite,
+                    fontWeight = FontWeight.Black,
+                    modifier = Modifier.padding(bottom = 8.dp)
+                )
+                Text(
+                    text = "Score final: ${state.homeScore} - ${state.awayScore}",
+                    style = MaterialTheme.typography.headlineMedium,
+                    color = FieldGreen,
+                    modifier = Modifier.padding(bottom = 32.dp)
+                )
+                
+                HudButton(
+                    text = "Exporter les statistiques CSV",
+                    onClick = onExportCsv,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(bottom = 12.dp)
+                )
+                HudButton(
+                    text = "Envoyer vers le site Web",
+                    onClick = onUploadCsv,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(bottom = 12.dp)
+                )
+                HudButton(
+                    text = "Exporter en PDF",
+                    onClick = onExportPdf,
+                    accent = HudBlue,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(bottom = 12.dp)
+                )
+                
+                Spacer(Modifier.height(8.dp))
+                
+                HudButton(
+                    text = "Nouvelle partie",
+                    onClick = onNewGame,
+                    accent = HudOrange,
+                    modifier = Modifier.fillMaxWidth()
+                )
+            }
         }
     }
 }

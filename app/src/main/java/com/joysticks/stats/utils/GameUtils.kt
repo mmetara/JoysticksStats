@@ -10,7 +10,7 @@ fun getShortResult(result: BattingResult): String {
         BattingResult.HomeRun -> "CC"
         BattingResult.Optionel -> "Opt"
         BattingResult.Strikeout -> "K"
-        BattingResult.Out -> "OUT"
+        BattingResult.Out -> "R"
     }
 }
 

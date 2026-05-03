@@ -40,6 +40,8 @@ import com.joysticks.stats.ui.theme.HudBlue
 import com.joysticks.stats.ui.theme.HudBorder
 import com.joysticks.stats.ui.theme.HudMuted
 import com.joysticks.stats.ui.theme.HudPanelSoft
+import com.joysticks.stats.ui.navigation.Screen
+import com.joysticks.stats.utils.NetworkUtils
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -71,7 +73,7 @@ fun HomeScreen(navController: NavController, viewModel: GameViewModel) {
                 }
                 viewModel.loadRoster(parsedRoster)
                 statusMessage = "Import réussi"
-                navController.navigate("game")
+                navController.navigate(Screen.Game.route)
             } catch (e: Exception) {
                 statusMessage = "Import impossible: fichier invalide"
                 Toast.makeText(context, "Import impossible: fichier invalide", Toast.LENGTH_LONG).show()
@@ -82,33 +84,36 @@ fun HomeScreen(navController: NavController, viewModel: GameViewModel) {
     }
 
     val onDownloadClick: () -> Unit = {
-        if (isBusy) {
-            Unit
-        } else {
-            scope.launch {
-                isBusy = true
-                statusMessage = "Téléchargement en cours..."
-                Toast.makeText(context, "Téléchargement en cours...", Toast.LENGTH_SHORT).show()
-                try {
-                    val roster = withContext(Dispatchers.IO) {
-                        val file = repository.downloadRoster(context) ?: return@withContext null
-                        val uri = Uri.fromFile(file)
-                        parseRoster(context, uri)
-                    }
+        if (!isBusy) {
+            if (!NetworkUtils.isTargetWifiConnected(context)) {
+                statusMessage = "Erreur: Connectez-vous au WiFi 'mmetara'"
+                Toast.makeText(context, "Veuillez vous connecter au WiFi 'mmetara'", Toast.LENGTH_LONG).show()
+            } else {
+                scope.launch {
+                    isBusy = true
+                    statusMessage = "Téléchargement en cours..."
+                    Toast.makeText(context, "Téléchargement en cours...", Toast.LENGTH_SHORT).show()
+                    try {
+                        val roster = withContext(Dispatchers.IO) {
+                            val file = repository.downloadRoster(context) ?: return@withContext null
+                            val uri = Uri.fromFile(file)
+                            parseRoster(context, uri)
+                        }
 
-                    if (roster == null) {
-                        statusMessage = "Erreur de téléchargement"
-                        Toast.makeText(context, "Erreur de téléchargement", Toast.LENGTH_LONG).show()
-                    } else {
-                        statusMessage = "Téléchargement réussi"
-                        viewModel.loadRoster(roster)
-                        navController.navigate("game")
+                        if (roster == null) {
+                            statusMessage = "Erreur de téléchargement"
+                            Toast.makeText(context, "Erreur de téléchargement", Toast.LENGTH_LONG).show()
+                        } else {
+                            statusMessage = "Téléchargement réussi"
+                            viewModel.loadRoster(roster)
+                            navController.navigate(Screen.Game.route)
+                        }
+                    } catch (e: Exception) {
+                        statusMessage = "Téléchargement impossible"
+                        Toast.makeText(context, "Téléchargement impossible", Toast.LENGTH_LONG).show()
+                    } finally {
+                        isBusy = false
                     }
-                } catch (e: Exception) {
-                    statusMessage = "Téléchargement impossible"
-                    Toast.makeText(context, "Téléchargement impossible", Toast.LENGTH_LONG).show()
-                } finally {
-                    isBusy = false
                 }
             }
         }
@@ -129,23 +134,23 @@ fun HomeScreen(navController: NavController, viewModel: GameViewModel) {
             ) {
                 HudPanel(
                     modifier = Modifier
-                        .padding(16.dp)
+                        .padding(12.dp)
                         .widthIn(max = 460.dp)
                         .fillMaxWidth(),
                     shape = RoundedCornerShape(10.dp),
                     borderColor = HudBorder,
-                    contentPadding = PaddingValues(24.dp)
+                    contentPadding = PaddingValues(16.dp)
                 ) {
                     Column(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(24.dp),
+                            .padding(16.dp),
                         horizontalAlignment = Alignment.CenterHorizontally
                     ) {
 
                         Text(
                             text = "JOYSTICKS STATS",
-                            fontSize = 30.sp,
+                            fontSize = 28.sp,
                             fontWeight = FontWeight.Black,
                             color = ChalkWhite
                         )
@@ -157,7 +162,7 @@ fun HomeScreen(navController: NavController, viewModel: GameViewModel) {
                             color = FieldGreen
                         )
 
-                        Spacer(Modifier.height(24.dp))
+                        Spacer(Modifier.height(16.dp))
                         HudButton(
                             text = "Télécharger l'alignement",
                             onClick = onDownloadClick,
@@ -165,7 +170,7 @@ fun HomeScreen(navController: NavController, viewModel: GameViewModel) {
                             enabled = !isBusy
                         )
 
-                        Spacer(Modifier.height(24.dp))
+                        Spacer(Modifier.height(16.dp))
 
                         HudButton(
                             text = "Importer l'alignement",
@@ -174,7 +179,7 @@ fun HomeScreen(navController: NavController, viewModel: GameViewModel) {
                             enabled = !isBusy
                         )
 
-                        Spacer(Modifier.height(12.dp))
+                        Spacer(Modifier.height(8.dp))
 
                         statusMessage?.let {
                             Text(
@@ -182,17 +187,17 @@ fun HomeScreen(navController: NavController, viewModel: GameViewModel) {
                                 color = if (it.contains("impossible") || it.contains("Erreur")) MaterialTheme.colorScheme.error else HudMuted,
                                 style = MaterialTheme.typography.labelSmall
                             )
-                            Spacer(Modifier.height(12.dp))
+                            Spacer(Modifier.height(8.dp))
                         }
 
                         HudButton(
                             text = "Gérer les équipes",
-                            onClick = { navController.navigate("Teams") },
+                            onClick = { navController.navigate(Screen.TeamManager.route) },
                             modifier = Modifier.fillMaxWidth(0.82f),
                             accent = HudPanelSoft
                         )
 
-                        Spacer(Modifier.height(24.dp)) // Added spacer for the new button
+                        Spacer(Modifier.height(16.dp)) // Added spacer for the new button
 
                         val isGameInProgress = viewModel.gameState.roster != null &&
                                 viewModel.gameState.screenMode != GameScreenMode.PRE_GAME &&
@@ -201,7 +206,7 @@ fun HomeScreen(navController: NavController, viewModel: GameViewModel) {
                         if (isGameInProgress) {
                             HudButton(
                                 text = "Retour à la partie",
-                                onClick = { navController.navigate("game") },
+                                onClick = { navController.navigate(Screen.Game.route) },
                                 modifier = Modifier.fillMaxWidth(0.82f),
                                 accent = HudBlue
                             )

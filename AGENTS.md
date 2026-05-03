@@ -109,7 +109,7 @@ Role: interfacer CSV, stockage local, reseau, exports.
 Perimetre:
 
 - app/src/main/java/com/joysticks/stats/engine/RosterParser.kt
-- app/src/main/java/com/joysticks/stats/engine/AlignementRopository.kt
+- app/src/main/java/com/joysticks/stats/engine/AlignementRepository.kt
 - app/src/main/java/com/joysticks/stats/engine/CsvReader.kt
 - app/src/main/java/com/joysticks/stats/data/Team.kt
 - app/src/main/java/com/joysticks/stats/data/TeamDataStore.kt

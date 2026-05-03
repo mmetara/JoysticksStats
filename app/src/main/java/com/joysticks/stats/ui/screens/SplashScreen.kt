@@ -27,6 +27,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.navigation.NavController
+import com.joysticks.stats.ui.navigation.Screen
 import com.joysticks.stats.ui.components.HudPanel
 import com.joysticks.stats.ui.theme.ChalkWhite
 import com.joysticks.stats.ui.theme.FieldGreen
@@ -56,8 +57,8 @@ fun SplashScreen(navController: NavController) {
             currentQuote = quotes.random()
         }
 
-        navController.navigate("home") {
-            popUpTo("splash") { inclusive = true }
+        navController.navigate(Screen.Home.route) {
+            popUpTo(Screen.SplashScreen.route) { inclusive = true }
         }
     }
 

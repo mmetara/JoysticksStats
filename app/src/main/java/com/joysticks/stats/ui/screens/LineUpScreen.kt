@@ -16,6 +16,10 @@ import com.joysticks.stats.ui.theme.ChalkWhite
 import com.joysticks.stats.ui.theme.FieldGreen
 import com.joysticks.stats.ui.theme.HudMuted
 
+import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.buildAnnotatedString
+import androidx.compose.ui.text.withStyle
+
 @Composable
 fun LineupScreen(roster: Roster) {
 
@@ -24,29 +28,28 @@ fun LineupScreen(roster: Roster) {
             horizontalAlignment = Alignment.CenterHorizontally,
             modifier = Modifier.fillMaxWidth()
         ) {
-        Text(
-            "Alignement partant (${roster.gameInfo.gameDate}  •  ${roster.gameInfo.gameTime})".uppercase(),
-            style = MaterialTheme.typography.titleLarge,
-            fontWeight = FontWeight.Bold,
-            color = FieldGreen,
-            textAlign = TextAlign.Center,
-            modifier = Modifier.fillMaxWidth()
-
-        )
-
-        Spacer(modifier = Modifier.height(20.dp))
-
-        roster.players.forEachIndexed { index, player ->
-
             Text(
-                text = "${index + 1}. ${player.playerName.uppercase()} - ${player.posDef}",
-                fontSize = 18.sp,
-                color = if (index == 0) ChalkWhite else HudMuted,
-                fontWeight = if (index == 0) FontWeight.ExtraBold else FontWeight.Bold
+                text = "ALIGNEMENT PARTANT",
+                style = MaterialTheme.typography.titleLarge,
+                color = FieldGreen,
+                fontWeight = FontWeight.Black,
+                fontSize = 22.sp,
+                textAlign = TextAlign.Center,
+                modifier = Modifier.fillMaxWidth()
             )
 
-            Spacer(modifier = Modifier.height(4.dp))
-        }
+            Spacer(modifier = Modifier.height(14.dp))
+
+            roster.players.forEachIndexed { index, player ->
+                Text(
+                    text = "${index + 1}. ${player.playerName.uppercase()} - ${player.posDef}",
+                    fontSize = 16.sp,
+                    color = ChalkWhite,
+                    fontWeight = FontWeight.Bold
+                )
+
+                Spacer(modifier = Modifier.height(4.dp))
+            }
         }
     }
 }

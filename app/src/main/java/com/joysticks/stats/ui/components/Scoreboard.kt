@@ -120,24 +120,7 @@ fun TeamRow(name: String, score: Int, isPrimary: Boolean = false) {
             modifier = Modifier.weight(1f),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Box(
-                modifier = Modifier
-                    .size(44.dp)
-                    .background(
-                        if (isPrimary) FieldGreen.copy(alpha = 0.16f) else Color.Black.copy(alpha = 0.24f),
-                        RoundedCornerShape(6.dp)
-                    )
-                    .border(1.dp, if (isPrimary) FieldGreen.copy(alpha = 0.45f) else HudBorder, RoundedCornerShape(6.dp)),
-                contentAlignment = Alignment.Center
-            ) {
-                Text(
-                    text = name.take(1).uppercase(),
-                    color = if (isPrimary) FieldGreenLight else HudMuted,
-                    fontWeight = FontWeight.Black
-                )
-            }
-
-            Spacer(Modifier.width(14.dp))
+            Spacer(Modifier.width(4.dp))
 
             Text(
                 name.uppercase(),

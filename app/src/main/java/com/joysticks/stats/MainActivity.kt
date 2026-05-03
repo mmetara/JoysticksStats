@@ -23,7 +23,7 @@ import androidx.core.view.WindowInsetsControllerCompat
 
 class MainActivity : ComponentActivity() {
 
-    private val forceImmersiveMode = false
+    private val forceImmersiveMode = true
 
     private val gameViewModel: GameViewModel by viewModels()
 

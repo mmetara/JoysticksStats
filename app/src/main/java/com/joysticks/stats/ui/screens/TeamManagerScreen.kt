@@ -1,5 +1,6 @@
 package com.joysticks.stats.ui.screens
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -7,6 +8,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -14,18 +16,13 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.navigation.NavController
 import com.joysticks.stats.data.Team
 import com.joysticks.stats.data.TeamDataStore
 import com.joysticks.stats.ui.components.HudButton
 import com.joysticks.stats.ui.components.HudPanel
-import com.joysticks.stats.ui.theme.ChalkWhite
-import com.joysticks.stats.ui.theme.FieldGreen
-import com.joysticks.stats.ui.theme.HudBlue
-import com.joysticks.stats.ui.theme.HudBorder
-import com.joysticks.stats.ui.theme.HudMuted
-import com.joysticks.stats.ui.theme.HudPanelSoft
-import com.joysticks.stats.ui.theme.HudRed
+import com.joysticks.stats.ui.theme.*
 import kotlinx.coroutines.launch
 
 @Composable
@@ -33,9 +30,7 @@ fun TeamManagementScreen(
     navController: NavController,
     teamStore: TeamDataStore
 ) {
-
     val scope = rememberCoroutineScope()
-
     var teams by remember { mutableStateOf(listOf<Team>()) }
     var newTeamName by remember { mutableStateOf("") }
     var teamToEdit by remember { mutableStateOf<Team?>(null) }
@@ -48,51 +43,62 @@ fun TeamManagementScreen(
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(horizontal = 24.dp, vertical = 30.dp),
+                .padding(horizontal = 24.dp, vertical = 24.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
+            // Top Bar
             Row(
-                modifier = Modifier.fillMaxWidth().widthIn(max = 760.dp),
+                modifier = Modifier.fillMaxWidth().widthIn(max = 800.dp),
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Text(
-                    text = "GESTION DES EQUIPES",
-                    style = MaterialTheme.typography.headlineMedium,
-                    color = ChalkWhite,
-                    fontWeight = FontWeight.Black
-                )
-                HudButton(
-                    text = "Retour",
-                    onClick = { navController.popBackStack() },
-                    accent = HudBlue,
-                    modifier = Modifier.width(140.dp)
-                )
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    IconButton(
+                        onClick = { navController.popBackStack() },
+                        modifier = Modifier.size(44.dp).background(HudPanel, RoundedCornerShape(8.dp))
+                    ) {
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, null, tint = ChalkWhite)
+                    }
+                    Spacer(Modifier.width(16.dp))
+                    Column {
+                        Text(
+                            text = "GESTION ÉQUIPES",
+                            style = MaterialTheme.typography.headlineMedium,
+                            color = ChalkWhite,
+                            fontWeight = FontWeight.Black,
+                            letterSpacing = 1.sp
+                        )
+                        Box(Modifier.width(60.dp).height(4.dp).background(FieldGreen))
+                    }
+                }
             }
 
-            Spacer(modifier = Modifier.height(16.dp))
+            Spacer(modifier = Modifier.height(32.dp))
 
-            HudPanel(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .widthIn(max = 760.dp),
-                borderColor = HudBorder
+            Row(
+                modifier = Modifier.fillMaxWidth().widthIn(max = 900.dp),
+                horizontalArrangement = Arrangement.spacedBy(24.dp)
             ) {
-                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                // Form Section
+                HudPanel(
+                    modifier = Modifier.weight(0.45f),
+                    borderColor = if (teamToEdit != null) HudBlue else HudBorder
+                ) {
                     Text(
-                        text = if (teamToEdit != null) "MODIFIER UNE EQUIPE" else "AJOUTER UNE EQUIPE",
+                        text = if (teamToEdit != null) "ÉDITION" else "NOUVELLE ÉQUIPE",
                         style = MaterialTheme.typography.labelMedium,
-                        color = FieldGreen,
-                        fontWeight = FontWeight.ExtraBold
+                        color = if (teamToEdit != null) HudBlue else FieldGreen,
+                        fontWeight = FontWeight.Black,
+                        letterSpacing = 1.sp
                     )
 
-                    Spacer(modifier = Modifier.height(10.dp))
+                    Spacer(modifier = Modifier.height(16.dp))
 
                     TextField(
                         value = newTeamName,
                         onValueChange = { newTeamName = it },
-                        label = { Text("Nom de l'equipe") },
-                        shape = RoundedCornerShape(10.dp),
+                        placeholder = { Text("Nom de l'équipe...", color = HudMuted) },
+                        shape = RoundedCornerShape(8.dp),
                         singleLine = true,
                         modifier = Modifier.fillMaxWidth(),
                         colors = TextFieldDefaults.colors(
@@ -100,17 +106,15 @@ fun TeamManagementScreen(
                             unfocusedContainerColor = HudPanelSoft,
                             focusedTextColor = ChalkWhite,
                             unfocusedTextColor = ChalkWhite,
-                            focusedLabelColor = FieldGreen,
-                            unfocusedLabelColor = HudMuted,
-                            focusedIndicatorColor = FieldGreen,
-                            unfocusedIndicatorColor = HudBorder
+                            focusedIndicatorColor = if (teamToEdit != null) HudBlue else FieldGreen,
+                            unfocusedIndicatorColor = Color.Transparent
                         )
                     )
 
-                    Spacer(modifier = Modifier.height(10.dp))
+                    Spacer(modifier = Modifier.height(20.dp))
 
                     HudButton(
-                        text = if (teamToEdit != null) "Mettre a jour" else "Ajouter",
+                        text = if (teamToEdit != null) "Mettre à jour" else "Ajouter l'équipe",
                         onClick = {
                             if (newTeamName.isNotBlank()) {
                                 val updated = if (teamToEdit != null) {
@@ -121,76 +125,83 @@ fun TeamManagementScreen(
                                     val newId = (teams.maxOfOrNull { it.id } ?: 0) + 1
                                     teams + Team(newId, newTeamName)
                                 }
-
                                 scope.launch {
                                     teamStore.saveTeams(updated)
                                     teams = updated
                                 }
-
                                 newTeamName = ""
                                 teamToEdit = null
                             }
                         },
-                        modifier = Modifier.fillMaxWidth(),
-                        accent = FieldGreen
+                        accent = if (teamToEdit != null) HudBlue else FieldGreen,
+                        modifier = Modifier.fillMaxWidth()
                     )
-                }
-            }
-
-            Spacer(modifier = Modifier.height(24.dp))
-
-            LazyColumn(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .widthIn(max = 760.dp)
-            ) {
-
-                items(teams) { team ->
-
-                    Surface(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(vertical = 4.dp),
-                        shape = RoundedCornerShape(8.dp),
-                        color = HudPanelSoft,
-                        border = androidx.compose.foundation.BorderStroke(1.dp, HudBorder)
-                    ) {
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(horizontal = 12.dp, vertical = 8.dp),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically
+                    
+                    if (teamToEdit != null) {
+                        TextButton(
+                            onClick = { teamToEdit = null; newTeamName = "" },
+                            modifier = Modifier.align(Alignment.CenterHorizontally).padding(top = 8.dp)
                         ) {
-                            Text(
-                                text = "${team.id} - ${team.name}",
-                                style = MaterialTheme.typography.bodyLarge,
-                                color = ChalkWhite
-                            )
+                            Text("ANNULER", color = HudRed, fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                        }
+                    }
+                }
 
-                            Row {
-                                TextButton(
-                                    onClick = {
-                                        teamToEdit = team
-                                        newTeamName = team.name
-                                    },
-                                    contentPadding = PaddingValues(horizontal = 8.dp, vertical = 0.dp)
+                // List Section
+                HudPanel(
+                    modifier = Modifier.weight(0.55f),
+                    borderColor = HudBorder
+                ) {
+                    Text(
+                        text = "RÉPERTOIRE (${teams.size})",
+                        style = MaterialTheme.typography.labelMedium,
+                        color = HudMuted,
+                        fontWeight = FontWeight.Black
+                    )
+
+                    Spacer(modifier = Modifier.height(16.dp))
+
+                    LazyColumn(
+                        modifier = Modifier.fillMaxWidth().heightIn(max = 400.dp),
+                        verticalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        items(teams) { team ->
+                            Surface(
+                                modifier = Modifier.fillMaxWidth(),
+                                shape = RoundedCornerShape(6.dp),
+                                color = HudPanelSoft.copy(alpha = 0.5f),
+                                border = androidx.compose.foundation.BorderStroke(1.dp, HudBorder.copy(alpha = 0.5f))
+                            ) {
+                                Row(
+                                    modifier = Modifier.padding(12.dp),
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.CenterVertically
                                 ) {
-                                    Icon(Icons.Default.Edit, contentDescription = "Modifier", tint = HudBlue)
-                                }
+                                    Column {
+                                        Text(
+                                            text = team.name.uppercase(),
+                                            style = MaterialTheme.typography.bodyLarge,
+                                            color = ChalkWhite,
+                                            fontWeight = FontWeight.Bold
+                                        )
+                                        Text(
+                                            text = "ID: #${team.id}",
+                                            fontSize = 10.sp,
+                                            color = HudMuted
+                                        )
+                                    }
 
-                                TextButton(
-                                    onClick = {
-                                        val updated = teams.filter { it.id != team.id }
-
-                                        scope.launch {
-                                            teamStore.saveTeams(updated)
-                                            teams = updated
+                                    Row {
+                                        IconButton(onClick = { teamToEdit = team; newTeamName = team.name }) {
+                                            Icon(Icons.Default.Edit, "Modifier", tint = HudBlue, modifier = Modifier.size(20.dp))
                                         }
-                                    },
-                                    contentPadding = PaddingValues(horizontal = 8.dp, vertical = 0.dp)
-                                ) {
-                                    Icon(Icons.Default.Delete, contentDescription = "Supprimer", tint = HudRed)
+                                        IconButton(onClick = {
+                                            val updated = teams.filter { it.id != team.id }
+                                            scope.launch { teamStore.saveTeams(updated) ; teams = updated }
+                                        }) {
+                                            Icon(Icons.Default.Delete, "Supprimer", tint = HudRed.copy(alpha = 0.7f), modifier = Modifier.size(20.dp))
+                                        }
+                                    }
                                 }
                             }
                         }

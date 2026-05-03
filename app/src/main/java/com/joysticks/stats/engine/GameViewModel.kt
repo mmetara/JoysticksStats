@@ -66,7 +66,25 @@ class GameViewModel : ViewModel() {
         val wasTop = gameState.isTop
         val nextIsTop = !wasTop
         val nextInning = if (!wasTop) gameState.inning + 1 else gameState.inning
+        val currentInning = gameState.inning
+        val isHomeBatting = gameState.isHomeTeamBatting()
         val r = gameState.roster ?: return
+
+        // --- NOUVEAU : Marquage précis de la fin de manche sur le frappeur ---
+        val history = gameState.gameHistory.toMutableList()
+        val lastBatterIdx = gameState.lastBatterCompletedIndex
+        
+        // On cherche l'événement du frappeur qui vient de terminer, ou le dernier de la manche
+        val eventIndex = if (lastBatterIdx != -1) {
+            history.indexOfLast { it.playerIndex == lastBatterIdx && it.inning == currentInning && it.isHomeTeam == isHomeBatting }
+        } else {
+            history.indexOfLast { it.inning == currentInning && it.isHomeTeam == isHomeBatting }
+        }
+        
+        if (eventIndex != -1) {
+            history[eventIndex] = history[eventIndex].copy(isLastOfInning = true)
+        }
+        // --- Fin du marquage ---
 
         val nextBatterIndexForOurTeam = if (gameState.lastBatterCompletedIndex != -1) {
             (gameState.lastBatterCompletedIndex + 1) % r.players.size
@@ -118,7 +136,9 @@ class GameViewModel : ViewModel() {
             playersWhoScored = emptySet(),
             runsThisHalfInning = 0,
             maxRunsReached = false,
+            threeOutsReached = false,
             halfInningBattersBatted = 0,
+            gameHistory = history
         )
     }
 
@@ -128,18 +148,22 @@ class GameViewModel : ViewModel() {
         val runsToUnscore = gameState.runsThisHalfInning - adjustedRuns
         repeat(runsToUnscore) { unscoreRun(gameState.isHomeTeamBatting()) }
 
-        gameState = gameState.copy(maxRunsReached = false)
+        gameState = gameState.copy(maxRunsReached = false, threeOutsReached = false)
 
         endHalfInning()
     }
 
-    fun recordOut() {
+    fun recordOut(playerIndex: Int = -1) {
         val newOuts = gameState.outs + 1
+        gameState = gameState.copy(outs = newOuts)
+        
+        // Si un joueur est spécifié, on marque son retrait dans l'historique
+        if (playerIndex != -1) {
+            updateHistoryEvent(playerIndex, finalBase = 0, outNumber = newOuts)
+        }
 
-        if (newOuts >= 3) {
-            endHalfInning()
-        } else {
-            gameState = gameState.copy(outs = newOuts)
+        if (gameState.outs >= 3) {
+            gameState = gameState.copy(threeOutsReached = true)
         }
     }
 
@@ -316,7 +340,8 @@ class GameViewModel : ViewModel() {
         result: BattingResult? = null,
         finalBase: Int? = null,
         rbi: Int? = null,
-        retiredOnOptionel: Boolean = false
+        retiredOnOptionel: Boolean = false,
+        outNumber: Int = 0
     ) {
         val history = gameState.gameHistory.toMutableList()
         val currentInning = gameState.inning
@@ -332,7 +357,8 @@ class GameViewModel : ViewModel() {
                 oldEvent.result
             }
 
-            val finalFinalBase = if (finalBase == 0 && oldEvent.finalBase > 0 && (oldEvent.result == BattingResult.Single || oldEvent.result == BattingResult.Double || oldEvent.result == BattingResult.Triple || oldEvent.result == BattingResult.HomeRun || oldEvent.result == BattingResult.Optionel)) {
+            val finalFinalBase = if (finalBase == 0 && oldEvent.finalBase > 0) {
+                // On préserve la base la plus avancée même si le joueur est retiré plus tard
                 oldEvent.finalBase
             } else {
                 finalBase ?: oldEvent.finalBase
@@ -342,14 +368,15 @@ class GameViewModel : ViewModel() {
                 result = newResult,
                 finalBase = finalFinalBase,
                 rbi = rbi ?: oldEvent.rbi,
-                retiredOnOptionel = retiredOnOptionel || oldEvent.retiredOnOptionel
+                retiredOnOptionel = retiredOnOptionel || oldEvent.retiredOnOptionel,
+                outNumber = if (outNumber > 0) outNumber else oldEvent.outNumber
             )
             history[index] = updatedEvent
 
         } else {
             val defaultResult = result ?: BattingResult.Out
             val defaultFinalBase = finalBase ?: 0
-            val newEvent = AtBatEvent(playerIndex, currentInning, defaultResult, defaultFinalBase, isHome, rbi ?: 0, retiredOnOptionel)
+            val newEvent = AtBatEvent(playerIndex, currentInning, defaultResult, defaultFinalBase, isHome, rbi ?: 0, retiredOnOptionel, outNumber)
             history.add(newEvent)
 
         }
@@ -471,24 +498,33 @@ class GameViewModel : ViewModel() {
             BattingResult.Optionel -> {
                 val r1Before = gameState.runnerOnFirst
                 val r2Before = gameState.runnerOnSecond
-                recordOut()
-                shouldAdvanceToNextBatter = (gameState.outs < 3)
-                if (shouldAdvanceToNextBatter) {
-                    rbiProduced = advanceRunners(1)
-                    if (gameState.runnerOnThird != -1 && r2Before != -1 && !gameState.playersWhoScored.contains(gameState.runnerOnThird)) {
-                        val retiredPlayer = gameState.runnerOnThird
-                        gameState = gameState.copy(runnerOnThird = -1)
-                        updateHistoryEvent(retiredPlayer, finalBase = 0, retiredOnOptionel = true)
-                    } else if (gameState.runnerOnSecond != -1 && r1Before != -1 && !gameState.playersWhoScored.contains(gameState.runnerOnSecond)) {
-                        val retiredPlayer = gameState.runnerOnSecond
-                        gameState = gameState.copy(runnerOnSecond = -1)
-                        updateHistoryEvent(retiredPlayer, finalBase = 0, retiredOnOptionel = true)
-                    }
+                
+                // IMPORTANT: On ne termine pas la manche ici via recordOut() car on a besoin des coureurs
+                // pour enregistrer qui est retiré. On incrémente juste le compteur de retraits.
+                val newOuts = gameState.outs + 1
+                gameState = gameState.copy(outs = newOuts)
+                
+                rbiProduced = advanceRunners(1)
+                
+                // On cherche le coureur le plus avancé pour le retirer (Priorité au 3B, puis 2B)
+                if (gameState.runnerOnThird != -1 && r2Before != -1 && !gameState.playersWhoScored.contains(gameState.runnerOnThird)) {
+                    val retiredPlayer = gameState.runnerOnThird
+                    gameState = gameState.copy(runnerOnThird = -1)
+                    updateHistoryEvent(retiredPlayer, finalBase = 0, retiredOnOptionel = true, outNumber = newOuts)
+                } else if (gameState.runnerOnSecond != -1 && r1Before != -1 && !gameState.playersWhoScored.contains(gameState.runnerOnSecond)) {
+                    val retiredPlayer = gameState.runnerOnSecond
+                    gameState = gameState.copy(runnerOnSecond = -1)
+                    updateHistoryEvent(retiredPlayer, finalBase = 0, retiredOnOptionel = true, outNumber = newOuts)
+                } else if (r1Before != -1) {
+                    // Si on était au 1er but
+                    val retiredPlayer = r1Before
+                    updateHistoryEvent(retiredPlayer, finalBase = 0, retiredOnOptionel = true, outNumber = newOuts)
                 }
             }
             BattingResult.Strikeout, BattingResult.Out -> {
-                updateHistoryEvent(batterIdx, finalBase = 0, result = result)
-                recordOut()
+                val newOuts = gameState.outs + 1
+                updateHistoryEvent(batterIdx, finalBase = 0, result = result, outNumber = newOuts)
+                gameState = gameState.copy(outs = newOuts)
                 shouldAdvanceToNextBatter = (gameState.outs < 3)
             }
         }
@@ -500,7 +536,7 @@ class GameViewModel : ViewModel() {
             BattingResult.HomeRun -> if (isHomeRunAction && checkHomeRunLimitReached()) 2 else 4
             else -> 0
         }
-        updateHistoryEvent(batterIdx, result, finalBase = finalBaseOfBatter, rbi = rbiProduced, retiredOnOptionel = (result == BattingResult.Optionel))
+        updateHistoryEvent(batterIdx, result, finalBase = finalBaseOfBatter, rbi = rbiProduced, retiredOnOptionel = false)
         gameState = gameState.copy(lastBatterCompletedIndex = batterIdx)
         if (shouldAdvanceToNextBatter) {
             val nextIndex = (gameState.currentBatterIndex + 1) % r.players.size
@@ -510,7 +546,7 @@ class GameViewModel : ViewModel() {
             )
         }
         if (gameState.outs >= 3) {
-            endHalfInning()
+            gameState = gameState.copy(threeOutsReached = true)
         }
     }
 
@@ -603,7 +639,7 @@ class GameViewModel : ViewModel() {
             runnerOnThird = r3
         )
         updateHistoryEvent(playerIndex, finalBase = 0)
-        recordOut()
+        recordOut(playerIndex)
     }
     fun manualAddRBI(playerIndex: Int) {
         val currentInning = gameState.inning

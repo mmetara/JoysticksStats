@@ -151,14 +151,14 @@ fun HudActionButton(
                     fontSize = 24.sp,
                     lineHeight = 26.sp,
                     fontWeight = FontWeight.Black,
-                    color = if (selected) accent else accent.copy(alpha = 0.95f),
+                    color = if (filledStyle) Color.White else (if (selected) accent else accent.copy(alpha = 0.95f)),
                     textAlign = TextAlign.Center
                 )
                 if (subLabel != null) {
                     Text(
                         text = subLabel,
                         style = MaterialTheme.typography.labelSmall,
-                        color = if (selected || emphasizeSubLabel) accent.copy(alpha = 0.9f) else HudMuted,
+                        color = if (filledStyle) Color.White.copy(alpha = 0.85f) else (if (selected || emphasizeSubLabel) accent.copy(alpha = 0.9f) else HudMuted),
                         textAlign = TextAlign.Center
                     )
                 }
