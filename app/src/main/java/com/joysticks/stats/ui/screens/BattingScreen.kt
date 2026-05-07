@@ -34,6 +34,7 @@ import androidx.compose.ui.unit.sp
 import com.joysticks.stats.engine.BattingResult
 import com.joysticks.stats.engine.GameState
 import com.joysticks.stats.ui.components.HudActionButton
+import com.joysticks.stats.ui.components.PlayerAvatar
 import com.joysticks.stats.ui.components.Scoreboard
 import com.joysticks.stats.ui.theme.ChalkWhite
 import com.joysticks.stats.ui.theme.FieldGreen
@@ -186,8 +187,8 @@ fun BattingPanel(
             }
         } else {
             playerIdx = state.currentBatterIndex
-            currentResult = state.atBatResults[playerIdx]
             val lastEvent = state.gameHistory.findLast { it.playerIndex == playerIdx && it.inning == state.inning && it.isHomeTeam == state.isHomeTeamBatting() }
+            currentResult = lastEvent?.result ?: state.atBatResults[playerIdx]
             currentRBIState = lastEvent?.rbi ?: 0
             retiredOnOptionelState = lastEvent?.retiredOnOptionel ?: false
         }
@@ -241,22 +242,38 @@ fun BattingPanel(
                 fontWeight = FontWeight.Black,
                 letterSpacing = 2.sp
             )
-            var batterFontSize by remember { mutableStateOf(32.sp) }
-            Text(
-                text = ((if (isEditingEvent) state.roster?.players?.find { it.index == playerIdx }?.playerName else state.currentBatter?.playerName ?: "---") ?: "").uppercase(),
-                color = ChalkWhite,
-                fontSize = batterFontSize,
-                lineHeight = 36.sp,
-                fontWeight = FontWeight.Black,
-                textAlign = TextAlign.Center,
-                maxLines = 1,
-                onTextLayout = { textLayoutResult ->
-                    if (textLayoutResult.hasVisualOverflow && batterFontSize > 12.sp) {
-                        batterFontSize *= 0.9f
-                    }
+            
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.Center
+            ) {
+                val currentPlayer = if (isEditingEvent) state.roster?.players?.find { it.index == playerIdx } else state.currentBatter
+                PlayerAvatar(
+                    photoUrl = currentPlayer?.photoUrl,
+                    modifier = Modifier.size(64.dp),
+                    borderColor = FieldGreen,
+                    playerName = currentPlayer?.playerName
+                )
+                Spacer(Modifier.width(16.dp))
+                Column {
+                    var batterFontSize by remember { mutableStateOf(32.sp) }
+                    Text(
+                        text = (currentPlayer?.playerName ?: "").uppercase(),
+                        color = ChalkWhite,
+                        fontSize = batterFontSize,
+                        lineHeight = 36.sp,
+                        fontWeight = FontWeight.Black,
+                        textAlign = TextAlign.Start,
+                        maxLines = 1,
+                        onTextLayout = { textLayoutResult ->
+                            if (textLayoutResult.hasVisualOverflow && batterFontSize > 12.sp) {
+                                batterFontSize *= 0.9f
+                            }
+                        }
+                    )
+                    Box(Modifier.width(60.dp).height(4.dp).background(FieldGreen))
                 }
-            )
-            Box(Modifier.width(60.dp).height(4.dp).background(FieldGreen).padding(top = 4.dp))
+            }
 
             Spacer(Modifier.height(centerGap))
 
@@ -312,10 +329,10 @@ fun BattingPanel(
                     Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(horizontal = 16.dp)) {
                         IconButton(
                             onClick = onPreviousBatter,
-                            enabled = state.currentBatterIndex != state.firstBatterIndexOfHalfInning,
+                            enabled = state.halfInningBattersBatted > 0,
                             modifier = Modifier.size(38.dp)
                         ) {
-                            Icon(Icons.AutoMirrored.Filled.ArrowBack, null, modifier = Modifier.size(24.dp), tint = if (state.currentBatterIndex != state.firstBatterIndexOfHalfInning) FieldGreen else HudMuted)
+                            Icon(Icons.AutoMirrored.Filled.ArrowBack, null, modifier = Modifier.size(24.dp), tint = if (state.halfInningBattersBatted > 0) FieldGreen else HudMuted)
                         }
                         Text(
                             text = (if (currentResult != null) getShortResult(currentResult!!) else "EN COURS").uppercase(),
@@ -364,7 +381,16 @@ fun BattingPanel(
                 Column(modifier = Modifier.padding(12.dp), horizontalAlignment = Alignment.CenterHorizontally) {
                     Text("EN ATTENTE", color = HudMuted, style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold, letterSpacing = 1.sp)
                     Spacer(Modifier.height(8.dp))
-                    NextPlayerAvatar(size = nextAvatarSize * 0.82f, progress = progress)
+                    Box(contentAlignment = Alignment.Center) {
+                        NextPlayerAvatar(size = nextAvatarSize * 0.82f, progress = progress)
+                        PlayerAvatar(
+                            photoUrl = nextPlayer?.photoUrl,
+                            modifier = Modifier.size(nextAvatarSize * 0.65f),
+                            borderColor = Color.Transparent,
+                            showPlaceholder = false,
+                            playerName = nextPlayer?.playerName
+                        )
+                    }
                     Spacer(Modifier.height(8.dp))
                     Text(
                         (nextPlayer?.playerName ?: "---").uppercase(),
@@ -460,25 +486,28 @@ private fun NextPlayerStat(label: String, value: String) {
 
 @Composable
 private fun NextPlayerAvatar(size: Dp, progress: Float = 0.8f) {
-    Canvas(modifier = Modifier.size(size)) {
-        val center = Offset(this.size.width / 2f, this.size.height / 2f)
-        val radius = this.size.minDimension * 0.46f
-        drawCircle(Color.Black.copy(alpha = 0.40f), radius = radius, center = center)
+    Box(modifier = Modifier.size(size), contentAlignment = Alignment.Center) {
+        Canvas(modifier = Modifier.fillMaxSize()) {
+            val center = Offset(this.size.width / 2f, this.size.height / 2f)
+            val radius = this.size.minDimension * 0.46f
+            drawCircle(Color.Black.copy(alpha = 0.40f), radius = radius, center = center)
+            
+            // Cercle de progression (dynamique)
+            drawArc(
+                color = FieldGreenLight.copy(alpha = 0.90f),
+                startAngle = -90f,
+                sweepAngle = 360f * progress.coerceIn(0.1f, 1f),
+                useCenter = false,
+                topLeft = Offset(center.x - radius, center.y - radius),
+                size = Size(radius * 2f, radius * 2f),
+                style = Stroke(width = 4f)
+            )
+        }
         
-        // Cercle de progression (dynamique)
-        drawArc(
-            color = FieldGreenLight.copy(alpha = 0.90f),
-            startAngle = -90f,
-            sweepAngle = 360f * progress.coerceIn(0.1f, 1f),
-            useCenter = false,
-            topLeft = Offset(center.x - radius, center.y - radius),
-            size = Size(radius * 2f, radius * 2f),
-            style = Stroke(width = 4f)
+        // Silhouette HUD mutualisée
+        com.joysticks.stats.ui.components.PlayerPlaceholder(
+            modifier = Modifier.fillMaxSize(0.7f)
         )
-        
-        // Silhouette HUD
-        drawCircle(color = Color(0xFF3B414A), radius = radius * 0.26f, center = Offset(center.x, center.y - radius * 0.22f))
-        drawOval(color = Color(0xFF3B414A), topLeft = Offset(center.x - radius * 0.52f, center.y + radius * 0.12f), size = Size(radius * 1.04f, radius * 0.52f))
     }
 }
 

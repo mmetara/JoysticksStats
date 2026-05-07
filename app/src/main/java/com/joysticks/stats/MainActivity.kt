@@ -21,11 +21,25 @@ import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
 
+import com.joysticks.stats.data.SettingsDataStore
+import com.joysticks.stats.data.GameDataStore
+import com.joysticks.stats.utils.NetworkUtils
+import androidx.lifecycle.lifecycleScope
+import androidx.lifecycle.ViewModel
+import androidx.lifecycle.ViewModelProvider
+import kotlinx.coroutines.launch
+
 class MainActivity : ComponentActivity() {
 
     private val forceImmersiveMode = true
 
-    private val gameViewModel: GameViewModel by viewModels()
+    private val gameViewModel: GameViewModel by viewModels {
+        object : ViewModelProvider.Factory {
+            override fun <T : ViewModel> create(modelClass: Class<T>): T {
+                return GameViewModel(GameDataStore(applicationContext)) as T
+            }
+        }
+    }
 
     private val createPdfDocumentLauncher = registerForActivityResult(
         ActivityResultContracts.CreateDocument("application/pdf")
@@ -38,6 +52,14 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         if (forceImmersiveMode) enterImmersiveMode(window)
+
+        // Initialize NetworkUtils with saved SSID
+        val settingsDataStore = SettingsDataStore(this)
+        lifecycleScope.launch {
+            settingsDataStore.targetSsidFlow.collect { ssid ->
+                NetworkUtils.targetSsid = ssid
+            }
+        }
 
         setContent {
 

@@ -28,7 +28,10 @@ suspend fun parseRoster(context: Context, uri: Uri): Roster {
         if (line.isBlank()) continue
         val columns = line.split(",").map { it.trim() }
 
-        if (columns.size < 7) continue
+        if (columns.size < 7) {
+            android.util.Log.w("RosterParser", "Ligne ignorée (colonnes insuffisantes < 7) : $line")
+            continue
+        }
 
         val eqId = columns[0].toIntOrNull() ?: 0
         val advId = columns[1].toIntOrNull() ?: 0
@@ -42,18 +45,22 @@ suspend fun parseRoster(context: Context, uri: Uri): Roster {
             // Fallback si la date est mal formatée
         }
 
-        isHomeTeam = columns[3] == "L"
+        isHomeTeam = columns[3].uppercase() == "L"
 
-        // On ne prend que les colonnes 4, 5 et 6 (Nom, Pos Off, Pos Def)
+        // On prend les colonnes 4, 5, 6 et optionnellement 7 (Nom, Pos Off, Pos Def, PhotoUrl)
+        val rawPhotoUrl = if (columns.size > 7) columns[7] else null
         players.add(
             PlayerStats(
                 index = players.size,
                 playerName = columns[4],
                 posOff = columns[5].toIntOrNull() ?: 0,
-                posDef = columns[6]
+                posDef = columns[6],
+                photoUrl = if (rawPhotoUrl.isNullOrBlank()) null else rawPhotoUrl
             )
         )
     }
+
+    android.util.Log.d("RosterParser", "Import terminé avec succès : ${players.size} joueurs chargés pour le match ${if (isHomeTeam) eqName else advName} vs ${if (isHomeTeam) advName else eqName}")
 
     val gameInfo = GameInfo(
         homeTeamName = if (isHomeTeam) eqName else advName,

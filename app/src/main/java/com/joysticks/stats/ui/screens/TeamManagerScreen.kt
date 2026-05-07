@@ -20,8 +20,10 @@ import androidx.compose.ui.unit.sp
 import androidx.navigation.NavController
 import com.joysticks.stats.data.Team
 import com.joysticks.stats.data.TeamDataStore
+import com.joysticks.stats.ui.components.BaseballScreenTemplate
 import com.joysticks.stats.ui.components.HudButton
 import com.joysticks.stats.ui.components.HudPanel
+import com.joysticks.stats.ui.components.HudScreenHeader
 import com.joysticks.stats.ui.theme.*
 import kotlinx.coroutines.launch
 
@@ -47,45 +49,25 @@ fun TeamManagementScreen(
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
             // Top Bar
-            Row(
-                modifier = Modifier.fillMaxWidth().widthIn(max = 800.dp),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    IconButton(
-                        onClick = { navController.popBackStack() },
-                        modifier = Modifier.size(44.dp).background(HudPanel, RoundedCornerShape(8.dp))
-                    ) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, null, tint = ChalkWhite)
-                    }
-                    Spacer(Modifier.width(16.dp))
-                    Column {
-                        Text(
-                            text = "GESTION ÉQUIPES",
-                            style = MaterialTheme.typography.headlineMedium,
-                            color = ChalkWhite,
-                            fontWeight = FontWeight.Black,
-                            letterSpacing = 1.sp
-                        )
-                        Box(Modifier.width(60.dp).height(4.dp).background(FieldGreen))
-                    }
-                }
-            }
+            HudScreenHeader(
+                title = "CLUBS",
+                onBack = { navController.popBackStack() },
+                modifier = Modifier.widthIn(max = 1200.dp)
+            )
 
             Spacer(modifier = Modifier.height(32.dp))
 
             Row(
-                modifier = Modifier.fillMaxWidth().widthIn(max = 900.dp),
+                modifier = Modifier.fillMaxWidth().widthIn(max = 1200.dp),
                 horizontalArrangement = Arrangement.spacedBy(24.dp)
             ) {
                 // Form Section
                 HudPanel(
-                    modifier = Modifier.weight(0.45f),
+                    modifier = Modifier.weight(0.40f),
                     borderColor = if (teamToEdit != null) HudBlue else HudBorder
                 ) {
                     Text(
-                        text = if (teamToEdit != null) "ÉDITION" else "NOUVELLE ÉQUIPE",
+                        text = if (teamToEdit != null) "PANNEAU ÉDITION" else "NOUVEAU CLUB",
                         style = MaterialTheme.typography.labelMedium,
                         color = if (teamToEdit != null) HudBlue else FieldGreen,
                         fontWeight = FontWeight.Black,
@@ -94,10 +76,12 @@ fun TeamManagementScreen(
 
                     Spacer(modifier = Modifier.height(16.dp))
 
+                    Text("Nom de l'équipe", color = HudMuted, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                    Spacer(Modifier.height(4.dp))
                     TextField(
                         value = newTeamName,
                         onValueChange = { newTeamName = it },
-                        placeholder = { Text("Nom de l'équipe...", color = HudMuted) },
+                        placeholder = { Text("Ex: Joysticks", color = HudMuted) },
                         shape = RoundedCornerShape(8.dp),
                         singleLine = true,
                         modifier = Modifier.fillMaxWidth(),
@@ -111,7 +95,7 @@ fun TeamManagementScreen(
                         )
                     )
 
-                    Spacer(modifier = Modifier.height(20.dp))
+                    Spacer(modifier = Modifier.height(24.dp))
 
                     HudButton(
                         text = if (teamToEdit != null) "Mettre à jour" else "Ajouter l'équipe",
@@ -119,11 +103,13 @@ fun TeamManagementScreen(
                             if (newTeamName.isNotBlank()) {
                                 val updated = if (teamToEdit != null) {
                                     teams.map {
-                                        if (it.id == teamToEdit!!.id) it.copy(name = newTeamName) else it
+                                        if (it.id == teamToEdit!!.id) {
+                                            it.copy(name = newTeamName)
+                                        } else it
                                     }
                                 } else {
                                     val newId = (teams.maxOfOrNull { it.id } ?: 0) + 1
-                                    teams + Team(newId, newTeamName)
+                                    teams + Team(newId, newTeamName, emptyList())
                                 }
                                 scope.launch {
                                     teamStore.saveTeams(updated)
@@ -139,7 +125,10 @@ fun TeamManagementScreen(
                     
                     if (teamToEdit != null) {
                         TextButton(
-                            onClick = { teamToEdit = null; newTeamName = "" },
+                            onClick = { 
+                                teamToEdit = null
+                                newTeamName = ""
+                            },
                             modifier = Modifier.align(Alignment.CenterHorizontally).padding(top = 8.dp)
                         ) {
                             Text("ANNULER", color = HudRed, fontWeight = FontWeight.Bold, fontSize = 12.sp)
@@ -149,11 +138,11 @@ fun TeamManagementScreen(
 
                 // List Section
                 HudPanel(
-                    modifier = Modifier.weight(0.55f),
+                    modifier = Modifier.weight(0.60f),
                     borderColor = HudBorder
                 ) {
                     Text(
-                        text = "RÉPERTOIRE (${teams.size})",
+                        text = "RÉPERTOIRE DES CLUBS (${teams.size})",
                         style = MaterialTheme.typography.labelMedium,
                         color = HudMuted,
                         fontWeight = FontWeight.Black
@@ -162,7 +151,7 @@ fun TeamManagementScreen(
                     Spacer(modifier = Modifier.height(16.dp))
 
                     LazyColumn(
-                        modifier = Modifier.fillMaxWidth().heightIn(max = 400.dp),
+                        modifier = Modifier.fillMaxWidth().heightIn(max = 500.dp),
                         verticalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
                         items(teams) { team ->
@@ -177,7 +166,7 @@ fun TeamManagementScreen(
                                     horizontalArrangement = Arrangement.SpaceBetween,
                                     verticalAlignment = Alignment.CenterVertically
                                 ) {
-                                    Column {
+                                    Column(modifier = Modifier.weight(1f)) {
                                         Text(
                                             text = team.name.uppercase(),
                                             style = MaterialTheme.typography.bodyLarge,
@@ -186,13 +175,16 @@ fun TeamManagementScreen(
                                         )
                                         Text(
                                             text = "ID: #${team.id}",
-                                            fontSize = 10.sp,
+                                            fontSize = 9.sp,
                                             color = HudMuted
                                         )
                                     }
 
                                     Row {
-                                        IconButton(onClick = { teamToEdit = team; newTeamName = team.name }) {
+                                        IconButton(onClick = { 
+                                            teamToEdit = team
+                                            newTeamName = team.name
+                                        }) {
                                             Icon(Icons.Default.Edit, "Modifier", tint = HudBlue, modifier = Modifier.size(20.dp))
                                         }
                                         IconButton(onClick = {

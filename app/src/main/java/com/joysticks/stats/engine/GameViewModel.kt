@@ -5,14 +5,41 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.joysticks.stats.data.GameDataStore
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import com.joysticks.stats.utils.CsvExportUtils
+import kotlinx.coroutines.flow.first
 
-class GameViewModel : ViewModel() {
+class GameViewModel(private val gameDataStore: GameDataStore? = null) : ViewModel() {
 
     val devMode = true
     var gameState by mutableStateOf(GameState())
         private set
+
+    init {
+        // Tenter de restaurer la partie au démarrage
+        gameDataStore?.let { store ->
+            viewModelScope.launch {
+                val savedState = store.gameStateFlow.first()
+                if (savedState != null) {
+                    gameState = savedState
+                    // Si on était en train de compter, on relance
+                    if (gameState.countdownSeconds > 0) {
+                        startCountdown()
+                    }
+                }
+            }
+        }
+    }
+
+    private fun saveState() {
+        gameDataStore?.let { store ->
+            viewModelScope.launch {
+                store.saveGameState(gameState)
+            }
+        }
+    }
 
     fun loadRoster(newRoster: Roster) {
         resetGame()
@@ -27,6 +54,7 @@ class GameViewModel : ViewModel() {
             countdownSeconds = seconds,
             screenMode = GameScreenMode.PRE_GAME
         )
+        saveState()
     }
 
     fun startGame() {
@@ -38,6 +66,7 @@ class GameViewModel : ViewModel() {
             GameScreenMode.BATTING
 
         gameState = gameState.copy(
+            gameStarted = true,
             inning = 1,
             isTop = true,
             waitingOpponentScore = r.gameInfo.isHomeTeam,
@@ -60,6 +89,7 @@ class GameViewModel : ViewModel() {
             homeRunLimitReached = false,
             halfInningBattersBatted = 0,
         )
+        saveState()
     }
 
     private fun endHalfInning() {
@@ -140,6 +170,7 @@ class GameViewModel : ViewModel() {
             halfInningBattersBatted = 0,
             gameHistory = history
         )
+        saveState()
     }
 
     fun forceEndHalfInningFromUI() {
@@ -151,20 +182,23 @@ class GameViewModel : ViewModel() {
         gameState = gameState.copy(maxRunsReached = false, threeOutsReached = false)
 
         endHalfInning()
+        saveState()
     }
 
     fun recordOut(playerIndex: Int = -1) {
         val newOuts = gameState.outs + 1
-        gameState = gameState.copy(outs = newOuts)
+        var newState = gameState.copy(outs = newOuts)
         
         // Si un joueur est spécifié, on marque son retrait dans l'historique
         if (playerIndex != -1) {
-            updateHistoryEvent(playerIndex, finalBase = 0, outNumber = newOuts)
+            newState = newState.updateHistory(playerIndex, finalBase = 0, outNumber = newOuts)
         }
 
-        if (gameState.outs >= 3) {
-            gameState = gameState.copy(threeOutsReached = true)
+        if (newOuts >= 3) {
+            newState = newState.copy(threeOutsReached = true)
         }
+        gameState = newState
+        saveState()
     }
 
     fun scoreRun(isHome: Boolean) {
@@ -197,6 +231,7 @@ class GameViewModel : ViewModel() {
             runsThisHalfInning = newRunsThisHalfInning,
             maxRunsReached = newMaxRunsReached
         )
+        saveState()
     }
 
     fun unscoreRun(isHome: Boolean) {
@@ -208,12 +243,18 @@ class GameViewModel : ViewModel() {
         if (gameState.runsThisHalfInning < 3) {
             gameState = gameState.copy(maxRunsReached = false)
         }
+        saveState()
     }
 
     fun resetGame() {
         gameState = GameState(
             opponentRunsPerInning = emptyMap()
         )
+        gameDataStore?.let {
+            viewModelScope.launch {
+                it.clearGame()
+            }
+        }
     }
 
     fun startCountdown() {
@@ -308,29 +349,35 @@ class GameViewModel : ViewModel() {
             halfInningBattersBatted = 0,
             opponentRunsPerInning = newOpponentRunsPerInning
         )
+        saveState()
     }
 
     fun nextBatter() {
         val r = gameState.roster ?: return
+        
+        // Avant d'avancer, on vérifie si on est en fin de manche (9ème+)
+        if (gameState.inning >= 9 && gameState.halfInningBattersBatted >= r.players.size) {
+            endHalfInning()
+            return
+        }
+
         val nextIndex = (gameState.currentBatterIndex + 1) % r.players.size
         gameState = gameState.copy(
             currentBatterIndex = nextIndex,
             halfInningBattersBatted = gameState.halfInningBattersBatted + 1
         )
-
-        if (gameState.inning >= 9 && gameState.halfInningBattersBatted >= r.players.size) {
-            endHalfInning()
-        }
+        saveState()
     }
 
     fun previousBatter() {
-        if (gameState.currentBatterIndex == gameState.firstBatterIndexOfHalfInning) return
+        if (gameState.halfInningBattersBatted <= 0) return
         val r = gameState.roster ?: return
         val prevIndex = (gameState.currentBatterIndex - 1 + r.players.size) % r.players.size
         gameState = gameState.copy(
             currentBatterIndex = prevIndex,
             halfInningBattersBatted = gameState.halfInningBattersBatted - 1
         )
+        saveState()
     }
 
     private fun isHomeTeam(): Boolean = gameState.roster?.gameInfo?.isHomeTeam ?: false
@@ -343,236 +390,42 @@ class GameViewModel : ViewModel() {
         retiredOnOptionel: Boolean = false,
         outNumber: Int = 0
     ) {
-        val history = gameState.gameHistory.toMutableList()
-        val currentInning = gameState.inning
-        val isHome = gameState.isHomeTeamBatting()
-
-        val index = history.indexOfLast { it.playerIndex == playerIndex && it.inning == currentInning && it.isHomeTeam == isHome }
-
-        if (index != -1) {
-            val oldEvent = history[index]
-            val newResult = if (result != null && !(oldEvent.result == BattingResult.Single || oldEvent.result == BattingResult.Double || oldEvent.result == BattingResult.Triple || oldEvent.result == BattingResult.HomeRun || oldEvent.result == BattingResult.Optionel)) {
-                result
-            } else {
-                oldEvent.result
-            }
-
-            val finalFinalBase = if (finalBase == 0 && oldEvent.finalBase > 0) {
-                // On préserve la base la plus avancée même si le joueur est retiré plus tard
-                oldEvent.finalBase
-            } else {
-                finalBase ?: oldEvent.finalBase
-            }
-
-            val updatedEvent = oldEvent.copy(
-                result = newResult,
-                finalBase = finalFinalBase,
-                rbi = rbi ?: oldEvent.rbi,
-                retiredOnOptionel = retiredOnOptionel || oldEvent.retiredOnOptionel,
-                outNumber = if (outNumber > 0) outNumber else oldEvent.outNumber
-            )
-            history[index] = updatedEvent
-
-        } else {
-            val defaultResult = result ?: BattingResult.Out
-            val defaultFinalBase = finalBase ?: 0
-            val newEvent = AtBatEvent(playerIndex, currentInning, defaultResult, defaultFinalBase, isHome, rbi ?: 0, retiredOnOptionel, outNumber)
-            history.add(newEvent)
-
-        }
-
-        gameState = gameState.copy(gameHistory = history)
-    }
-
-    private fun advanceRunners(bases: Int): Int {
-        val isHome = gameState.isHomeTeamBatting()
-        var r1 = gameState.runnerOnFirst
-        var r2 = gameState.runnerOnSecond
-        var r3 = gameState.runnerOnThird
-        val scorers = gameState.playersWhoScored.toMutableSet()
-        val batterIndex = gameState.currentBatterIndex
-        val initialScorersCount = scorers.size
-
-        repeat(bases) {
-            if (r3 != -1) {
-                scorers.add(r3)
-                updateHistoryEvent(r3, finalBase = 4)
-            }
-            r3 = r2
-            if (r3 != -1) updateHistoryEvent(r3, finalBase = 3)
-
-            r2 = r1
-            if (r2 != -1) updateHistoryEvent(r2, finalBase = 2)
-
-            r1 = if (it == 0) batterIndex else -1
-            if (r1 != -1) updateHistoryEvent(r1, finalBase = 1)
-        }
-
-        val newRuns = scorers.size - initialScorersCount
-        repeat(newRuns) { scoreRun(isHome) }
-
-        gameState = gameState.copy(
-            runnerOnFirst = r1,
-            runnerOnSecond = r2,
-            runnerOnThird = r3,
-            playersWhoScored = scorers
-        )
-        return newRuns
-    }
-
-    private fun checkHomeRunLimitReached(): Boolean {
-        val isHomeTeamBatting = gameState.isHomeTeamBatting()
-        val currentHomeRuns = if (isHomeTeamBatting) gameState.homeTeamHomeRuns else gameState.awayTeamHomeRuns
-        return currentHomeRuns >= 5
+        gameState = gameState.updateHistory(playerIndex, result, finalBase, rbi, retiredOnOptionel, outNumber)
     }
 
     fun handleBattingResult(result: BattingResult) {
-        val newAtBatResults = gameState.atBatResults.toMutableMap()
-        newAtBatResults[gameState.currentBatterIndex] = result
-        gameState = gameState.copy(atBatResults = newAtBatResults)
-
-        val batterIdx = gameState.currentBatterIndex
-        var rbiProduced = 0
-        var shouldAdvanceToNextBatter = true
-        var isHomeRunAction = false
-
-        val r = gameState.roster ?: return
-
-        when (result) {
-            BattingResult.Single -> {
-                rbiProduced = advanceRunners(1)
-            }
-            BattingResult.Double -> {
-                rbiProduced = advanceRunners(2)
-            }
-            BattingResult.Triple -> {
-                rbiProduced = advanceRunners(3)
-            }
-            BattingResult.HomeRun -> {
-                isHomeRunAction = true
-                val isHomeTeamBattingNow = isHomeTeam()
-
-                if (isHomeTeamBattingNow) {
-                    gameState = gameState.copy(homeTeamHomeRuns = gameState.homeTeamHomeRuns + 1)
-                } else {
-                    gameState = gameState.copy(awayTeamHomeRuns = gameState.awayTeamHomeRuns + 1)
-                }
-
-                if (checkHomeRunLimitReached()) {
-                    rbiProduced = advanceRunners(2)
-                    gameState = gameState.copy(homeRunLimitReached = true)
-                } else {
-                    val scorers = gameState.playersWhoScored.toMutableSet()
-                    var runnersScored = 0
-                    if (gameState.runnerOnFirst != -1) {
-                        scorers.add(gameState.runnerOnFirst)
-                        updateHistoryEvent(gameState.runnerOnFirst, finalBase = 4)
-                        runnersScored++
-                    }
-                    if (gameState.runnerOnSecond != -1) {
-                        scorers.add(gameState.runnerOnSecond)
-                        updateHistoryEvent(gameState.runnerOnSecond, finalBase = 4)
-                        runnersScored++
-                    }
-                    if (gameState.runnerOnThird != -1) {
-                        scorers.add(gameState.runnerOnThird)
-                        updateHistoryEvent(gameState.runnerOnThird, finalBase = 4)
-                        runnersScored++
-                    }
-                    rbiProduced = 1 + runnersScored
-
-                    scorers.add(batterIdx)
-
-                    val newRuns = scorers.size - gameState.playersWhoScored.size
-                    repeat(newRuns) { scoreRun(isHomeTeamBattingNow) }
-                    gameState = gameState.copy(
-                        runnerOnFirst = -1,
-                        runnerOnSecond = -1,
-                        runnerOnThird = -1,
-                        playersWhoScored = scorers
-                    )
-                }
-
-            }
-
-            BattingResult.Optionel -> {
-                val r1Before = gameState.runnerOnFirst
-                val r2Before = gameState.runnerOnSecond
-                
-                // IMPORTANT: On ne termine pas la manche ici via recordOut() car on a besoin des coureurs
-                // pour enregistrer qui est retiré. On incrémente juste le compteur de retraits.
-                val newOuts = gameState.outs + 1
-                gameState = gameState.copy(outs = newOuts)
-                
-                rbiProduced = advanceRunners(1)
-                
-                // On cherche le coureur le plus avancé pour le retirer (Priorité au 3B, puis 2B)
-                if (gameState.runnerOnThird != -1 && r2Before != -1 && !gameState.playersWhoScored.contains(gameState.runnerOnThird)) {
-                    val retiredPlayer = gameState.runnerOnThird
-                    gameState = gameState.copy(runnerOnThird = -1)
-                    updateHistoryEvent(retiredPlayer, finalBase = 0, retiredOnOptionel = true, outNumber = newOuts)
-                } else if (gameState.runnerOnSecond != -1 && r1Before != -1 && !gameState.playersWhoScored.contains(gameState.runnerOnSecond)) {
-                    val retiredPlayer = gameState.runnerOnSecond
-                    gameState = gameState.copy(runnerOnSecond = -1)
-                    updateHistoryEvent(retiredPlayer, finalBase = 0, retiredOnOptionel = true, outNumber = newOuts)
-                } else if (r1Before != -1) {
-                    // Si on était au 1er but
-                    val retiredPlayer = r1Before
-                    updateHistoryEvent(retiredPlayer, finalBase = 0, retiredOnOptionel = true, outNumber = newOuts)
-                }
-            }
-            BattingResult.Strikeout, BattingResult.Out -> {
-                val newOuts = gameState.outs + 1
-                updateHistoryEvent(batterIdx, finalBase = 0, result = result, outNumber = newOuts)
-                gameState = gameState.copy(outs = newOuts)
-                shouldAdvanceToNextBatter = (gameState.outs < 3)
-            }
-        }
-
-        val finalBaseOfBatter = when(result) {
-            BattingResult.Single, BattingResult.Optionel -> 1
-            BattingResult.Double -> 2
-            BattingResult.Triple -> 3
-            BattingResult.HomeRun -> if (isHomeRunAction && checkHomeRunLimitReached()) 2 else 4
-            else -> 0
-        }
-        updateHistoryEvent(batterIdx, result, finalBase = finalBaseOfBatter, rbi = rbiProduced, retiredOnOptionel = false)
-        gameState = gameState.copy(lastBatterCompletedIndex = batterIdx)
-        if (shouldAdvanceToNextBatter) {
-            val nextIndex = (gameState.currentBatterIndex + 1) % r.players.size
-            gameState = gameState.copy(
-                currentBatterIndex = nextIndex,
-                halfInningBattersBatted = gameState.halfInningBattersBatted + 1
-            )
-        }
-        if (gameState.outs >= 3) {
-            gameState = gameState.copy(threeOutsReached = true)
-        }
+        gameState = BattingHandler.handleBattingResult(
+            gameState = gameState,
+            result = result,
+            isHomeTeam = { isHomeTeam() }
+        )
+        saveState()
     }
 
     fun manualAdvancePlayer(playerIndex: Int) {
-        val currentInning = gameState.inning
         val isHome = gameState.isHomeTeamBatting()
         var r1 = gameState.runnerOnFirst
         var r2 = gameState.runnerOnSecond
         var r3 = gameState.runnerOnThird
         val scorers = gameState.playersWhoScored.toMutableSet()
+
         if (playerIndex == r3) {
             scorers.add(playerIndex)
             r3 = -1
             scoreRun(isHome)
-            updateHistoryEvent(playerIndex, finalBase = 4)
+            gameState = gameState.updateHistory(playerIndex, finalBase = 4)
         } else if (playerIndex == r2) {
             r3 = r2
             r2 = -1
-            updateHistoryEvent(playerIndex, finalBase = 3)
+            gameState = gameState.updateHistory(playerIndex, finalBase = 3)
         } else if (playerIndex == r1) {
             r2 = r1
             r1 = -1
-            updateHistoryEvent(playerIndex, finalBase = 2)
+            gameState = gameState.updateHistory(playerIndex, finalBase = 2)
         } else {
             return
         }
+
         gameState = gameState.copy(
             runnerOnFirst = r1,
             runnerOnSecond = r2,
@@ -582,7 +435,9 @@ class GameViewModel : ViewModel() {
         if (gameState.inning < 9 && gameState.runsThisHalfInning >= 3) {
             gameState = gameState.copy(maxRunsReached = true)
         }
+        saveState()
     }
+
     fun manualRetreatPlayer(playerIndex: Int) {
         val isHome = gameState.isHomeTeamBatting()
         var r1 = gameState.runnerOnFirst
@@ -590,27 +445,29 @@ class GameViewModel : ViewModel() {
         var r3 = gameState.runnerOnThird
         val scorers = gameState.playersWhoScored.toMutableSet()
         var rbiAdjustment = 0
+
         if (scorers.contains(playerIndex)) {
             if (r3 == -1) {
                 scorers.remove(playerIndex)
                 r3 = playerIndex
                 unscoreRun(isHome)
-                updateHistoryEvent(playerIndex, finalBase = 3)
+                gameState = gameState.updateHistory(playerIndex, finalBase = 3)
                 rbiAdjustment = -1
             }
         } else if (playerIndex == r3) {
             if (r2 == -1) {
                 r2 = r3
                 r3 = -1
-                updateHistoryEvent(playerIndex, finalBase = 2)
+                gameState = gameState.updateHistory(playerIndex, finalBase = 2)
             }
         } else if (playerIndex == r2) {
             if (r1 == -1) {
                 r1 = r2
                 r2 = -1
-                updateHistoryEvent(playerIndex, finalBase = 1)
+                gameState = gameState.updateHistory(playerIndex, finalBase = 1)
             }
         }
+
         gameState = gameState.copy(
             runnerOnFirst = r1,
             runnerOnSecond = r2,
@@ -622,7 +479,9 @@ class GameViewModel : ViewModel() {
             val oldEvent = gameState.gameHistory[currentBatterEventIndex]
             updateHistoryEvent(gameState.currentBatterIndex, rbi = oldEvent.rbi + rbiAdjustment)
         }
+        saveState()
     }
+
     fun manualRemovePlayer(playerIndex: Int) {
         var r1 = gameState.runnerOnFirst
         var r2 = gameState.runnerOnSecond
@@ -640,6 +499,7 @@ class GameViewModel : ViewModel() {
         )
         updateHistoryEvent(playerIndex, finalBase = 0)
         recordOut(playerIndex)
+        saveState()
     }
     fun manualAddRBI(playerIndex: Int) {
         val currentInning = gameState.inning
@@ -651,6 +511,7 @@ class GameViewModel : ViewModel() {
             history[index] = oldEvent.copy(rbi = oldEvent.rbi + 1)
             gameState = gameState.copy(gameHistory = history)
         }
+        saveState()
     }
     fun manualRemoveRBI(playerIndex: Int) {
         val currentInning = gameState.inning
@@ -664,77 +525,10 @@ class GameViewModel : ViewModel() {
                 gameState = gameState.copy(gameHistory = history)
             }
         }
+        saveState()
     }
     fun generateCsv(): String {
-
-        data class PlayerCsvStats(
-            var atBats: Int = 0,
-            var singles: Int = 0,
-            var doubles: Int = 0,
-            var triples: Int = 0,
-            var homeRuns: Int = 0,
-            var optionals: Int = 0,
-            var strikeouts: Int = 0,
-            var outs: Int = 0,
-            var runsScored: Int = 0,
-            var rbi: Int = 0
-        )
-        val roster = gameState.roster ?: return "Error: Roster not loaded."
-        val gameInfo = roster.gameInfo
-        val stringBuilder = StringBuilder()
-        val ourTeamNumber = (if (gameInfo.isHomeTeam) gameInfo.homeTeamName else gameInfo.awayTeamName).replace("Équipe ", "")
-        val opponentTeamNumber = (if (gameInfo.isHomeTeam) gameInfo.awayTeamName else gameInfo.homeTeamName).replace("Équipe ", "")
-        val gameDateTime = "${gameInfo.gameDate} ${gameInfo.gameTime}"
-        val teamStatus = if (gameInfo.isHomeTeam) "L" else "V"
-
-        val playerStatsMap = mutableMapOf<Int, PlayerCsvStats>()
-        roster.players.forEach { player ->
-            playerStatsMap[player.index] = PlayerCsvStats()
-        }
-        val finalPlateAppearances = mutableMapOf<Pair<Int, Int>, AtBatEvent>()
-        gameState.gameHistory.forEach { event ->
-            val key = Pair(event.playerIndex, event.inning)
-            finalPlateAppearances[key] = event
-        }
-        finalPlateAppearances.values.forEach { event ->
-            val stats = playerStatsMap[event.playerIndex] ?: PlayerCsvStats()
-            stats.atBats++
-            when (event.result) {
-                BattingResult.Single -> stats.singles++
-                BattingResult.Double -> stats.doubles++
-                BattingResult.Triple -> stats.triples++
-                BattingResult.HomeRun -> stats.homeRuns++
-                BattingResult.Optionel -> stats.optionals++
-                BattingResult.Strikeout -> stats.strikeouts++
-                BattingResult.Out -> stats.outs++
-            }
-            stats.rbi += event.rbi
-            playerStatsMap[event.playerIndex] = stats
-        }
-        gameState.gameHistory.forEach { event ->
-            if (event.finalBase == 4) {
-                val stats = playerStatsMap[event.playerIndex] ?: PlayerCsvStats()
-                stats.runsScored++
-                playerStatsMap[event.playerIndex] = stats
-            }
-        }
-        roster.players.forEach { player ->
-            val stats = playerStatsMap[player.index] ?: PlayerCsvStats()
-            val defensivePos = player.posDef
-            val offensivePos = player.index + 1
-            stringBuilder.append(
-                "${ourTeamNumber},${opponentTeamNumber},${gameDateTime},${teamStatus}," +
-                "${player.playerName},${offensivePos},${defensivePos}," +
-                "${stats.atBats},${stats.singles},${stats.doubles},${stats.triples},${stats.homeRuns}," +
-                "${stats.optionals},${stats.strikeouts}," +
-                "${stats.runsScored},${stats.rbi}\n"
-            )
-        }
-        val userTeamScore = if (gameInfo.isHomeTeam) gameState.homeScore else gameState.awayScore
-        val opponentTeamScore = if (gameInfo.isHomeTeam) gameState.awayScore else gameState.homeScore
-        stringBuilder.append("TOTAL POINTS,${ourTeamNumber},${userTeamScore}\n")
-        stringBuilder.append("TOTAL POINTS,${opponentTeamNumber},${opponentTeamScore}\n")
-        return stringBuilder.toString()
+        return CsvExportUtils.generateCsv(gameState)
     }
 
     // New function to edit a historical AtBatEvent
@@ -761,6 +555,7 @@ class GameViewModel : ViewModel() {
             }
 
             gameState = gameState.copy(gameHistory = history)
+            saveState()
         }
     }
 }

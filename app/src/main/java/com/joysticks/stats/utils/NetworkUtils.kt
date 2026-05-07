@@ -7,7 +7,7 @@ import android.net.wifi.WifiManager
 import android.os.Build
 
 object NetworkUtils {
-    private const val TARGET_SSID = "mmetara"
+    var targetSsid: String = "mmetara"
 
     fun isTargetWifiConnected(context: Context): Boolean {
         val connectivityManager = context.getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
@@ -36,6 +36,6 @@ object NetworkUtils {
             return false 
         }
         
-        return currentSsid.equals(TARGET_SSID, ignoreCase = true)
+        return currentSsid.equals(targetSsid, ignoreCase = true)
     }
 }

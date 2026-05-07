@@ -1,6 +1,7 @@
 package com.joysticks.stats.engine
 
 import android.content.Context
+import com.joysticks.stats.utils.NetworkUtils
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.io.File
@@ -8,13 +9,17 @@ import okhttp3.FormBody
 import okhttp3.OkHttpClient
 import okhttp3.Request
 
-class AlignementRepository {
+object AlignementRepository {
 
-    suspend fun uploadCSV(csvData: String): Boolean {
+    private val client = OkHttpClient()
+
+    suspend fun uploadCSV(context: Context, csvData: String): Result<Boolean> {
+        if (!NetworkUtils.isTargetWifiConnected(context)) {
+            return Result.failure(Exception("Veuillez vous connecter au WiFi 'mmetara'"))
+        }
+
         return withContext(Dispatchers.IO) {
             try {
-                val client = OkHttpClient()
-                
                 val formBody = FormBody.Builder()
                     .add("csvData", csvData)
                     .build()
@@ -25,19 +30,20 @@ class AlignementRepository {
                     .build()
 
                 val response = client.newCall(request).execute()
-                response.isSuccessful
+                Result.success(response.isSuccessful)
             } catch (e: Exception) {
-                e.printStackTrace()
-                false
+                Result.failure(e)
             }
         }
     }
 
-    suspend fun downloadRoster(context: Context): File? {
+    suspend fun downloadRoster(context: Context): Result<File> {
+        if (!NetworkUtils.isTargetWifiConnected(context)) {
+            return Result.failure(Exception("Veuillez vous connecter au WiFi 'mmetara'"))
+        }
+
         return withContext(Dispatchers.IO) {
             try {
-                val client = OkHttpClient()
-
                 val request = Request.Builder()
                     .url("http://lesjoysticks.info/db/alignements/out/alignement.csv")
                     .build()
@@ -45,23 +51,18 @@ class AlignementRepository {
                 val response = client.newCall(request).execute()
 
                 if (response.isSuccessful) {
-
                     val file = File(context.cacheDir, "alignement.csv")
-
                     response.body?.byteStream()?.use { input ->
                         file.outputStream().use { output ->
                             input.copyTo(output)
                         }
                     }
-
-                    file
+                    Result.success(file)
                 } else {
-                    null
+                    Result.failure(Exception("Erreur serveur: ${response.code}"))
                 }
-
             } catch (e: Exception) {
-                e.printStackTrace()
-                null
+                Result.failure(e)
             }
         }
     }
