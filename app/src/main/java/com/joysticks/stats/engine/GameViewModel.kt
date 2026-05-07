@@ -36,7 +36,11 @@ class GameViewModel(private val gameDataStore: GameDataStore? = null) : ViewMode
     private fun saveState() {
         gameDataStore?.let { store ->
             viewModelScope.launch {
-                store.saveGameState(gameState)
+                if (gameState.screenMode == GameScreenMode.GAME_OVER) {
+                    store.clearGame()
+                } else {
+                    store.saveGameState(gameState)
+                }
             }
         }
     }
