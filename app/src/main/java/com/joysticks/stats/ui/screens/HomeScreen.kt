@@ -122,11 +122,12 @@ fun HomeScreen(
                 val state = gameViewModel.gameState
                 
                 // Détection robuste : alignement chargé + progression (manche, historique ou mode)
-                val isGameInProgress = state.roster != null && (
+                // Masqué si le match est terminé (GAME_OVER)
+                val isGameInProgress = state.roster != null && 
+                    state.screenMode != GameScreenMode.GAME_OVER && (
                     state.gameStarted || 
                     state.inning > 1 || 
-                    state.gameHistory.isNotEmpty() ||
-                    state.screenMode != GameScreenMode.PRE_GAME
+                    state.gameHistory.isNotEmpty()
                 )
 
                 if (isGameInProgress) {
