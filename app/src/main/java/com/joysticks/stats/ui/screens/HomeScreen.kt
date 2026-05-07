@@ -122,20 +122,19 @@ fun HomeScreen(
                 val state = gameViewModel.gameState
                 
                 // Détection robuste : alignement chargé + progression (manche, historique ou mode)
-                // Masqué si le match est terminé (GAME_OVER)
-                val isGameInProgress = state.roster != null && 
-                    state.screenMode != GameScreenMode.GAME_OVER && (
+                val isGameInProgress = state.roster != null && (
                     state.gameStarted || 
                     state.inning > 1 || 
                     state.gameHistory.isNotEmpty()
                 )
 
                 if (isGameInProgress) {
+                    val isGameOver = state.screenMode == GameScreenMode.GAME_OVER
                     HudActionButton(
-                        label = "CONTINUER LA PARTIE",
-                        subLabel = "Manche ${state.inning} - ${if (state.isTop) "Haut" else "Bas"}",
+                        label = if (isGameOver) "VOIR RÉSULTAT FINAL" else "CONTINUER LA PARTIE",
+                        subLabel = if (isGameOver) "Match terminé" else "Manche ${state.inning} - ${if (state.isTop) "Haut" else "Bas"}",
                         modifier = Modifier.fillMaxWidth(),
-                        accent = Color(0xFFFF9800), // Orange pour se démarquer
+                        accent = if (isGameOver) HudBlue else Color(0xFFFF9800), // Bleu si fini, Orange si en cours
                         onClick = {
                             navController.navigate(Screen.Game.route)
                         }

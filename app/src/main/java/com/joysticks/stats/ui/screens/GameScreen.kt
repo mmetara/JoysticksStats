@@ -228,7 +228,8 @@ fun GameScreen(
                                 },
                                 onExportCsv = { createDocumentLauncher.launch("game_stats.txt") },
                                 onExportPdf = onExportPdf,
-                                onUploadCsv = onUploadCsv
+                                onUploadCsv = onUploadCsv,
+                                onBackToHome = onNavigateToHome
                             )
                         }
                     }
@@ -289,8 +290,11 @@ fun GameOverPanel(
     onNewGame: () -> Unit,
     onExportCsv: () -> Unit,
     onExportPdf: () -> Unit,
-    onUploadCsv: () -> Unit
+    onUploadCsv: () -> Unit,
+    onBackToHome: () -> Unit
 ) {
+    var showConfirmReset by remember { mutableStateOf(false) }
+
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -343,15 +347,48 @@ fun GameOverPanel(
                         .fillMaxWidth()
                         .padding(bottom = 12.dp)
                 )
-                
-                Spacer(Modifier.height(8.dp))
-                
+
                 HudButton(
-                    text = "Nouvelle partie",
-                    onClick = onNewGame,
-                    accent = HudOrange,
-                    modifier = Modifier.fillMaxWidth()
+                    text = "RETOUR À L'ACCUEIL",
+                    onClick = onBackToHome,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(bottom = 12.dp)
                 )
+                
+                Spacer(Modifier.height(16.dp))
+                
+                if (!showConfirmReset) {
+                    HudButton(
+                        text = "EFFACER ET NOUVEAU MATCH",
+                        onClick = { showConfirmReset = true },
+                        accent = HudOrange,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                } else {
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        Text(
+                            "Êtes-vous sûr ? Cela supprimera la sauvegarde.",
+                            color = HudOrange,
+                            fontSize = 12.sp,
+                            textAlign = TextAlign.Center,
+                            modifier = Modifier.padding(bottom = 8.dp)
+                        )
+                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            HudButton(
+                                text = "OUI, EFFACER",
+                                onClick = onNewGame,
+                                accent = HudRed,
+                                modifier = Modifier.weight(1f)
+                            )
+                            HudButton(
+                                text = "NON",
+                                onClick = { showConfirmReset = false },
+                                modifier = Modifier.weight(1f)
+                            )
+                        }
+                    }
+                }
             }
         }
     }
