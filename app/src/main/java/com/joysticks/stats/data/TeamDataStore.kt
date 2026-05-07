@@ -16,7 +16,8 @@ class TeamDataStore(private val context: Context) {
     suspend fun saveTeams(teams: List<Team>) {
 
         val serialized = teams.joinToString(";") {
-            "${it.id},${it.name}"
+            val players = it.playerNames.joinToString("|")
+            "${it.id},${it.name},$players"
         }
 
         context.teamDataStore.edit { prefs ->
@@ -34,10 +35,15 @@ class TeamDataStore(private val context: Context) {
 
             val parts = it.split(",")
 
-            if (parts.size == 2) {
+            if (parts.size >= 2) {
+                val players = if (parts.size > 2 && parts[2].isNotBlank()) {
+                    parts[2].split("|")
+                } else emptyList()
+                
                 Team(
                     id = parts[0].toInt(),
-                    name = parts[1]
+                    name = parts[1],
+                    playerNames = players
                 )
             } else null
         }

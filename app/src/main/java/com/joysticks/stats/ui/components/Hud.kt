@@ -1,45 +1,123 @@
 package com.joysticks.stats.ui.components
 
+import android.util.Log
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.ColumnScope
-import androidx.compose.foundation.layout.PaddingValues
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.runtime.Composable
+import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
-import androidx.compose.foundation.clickable
-import androidx.compose.foundation.border
-import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.material.ripple.rememberRipple
+import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.runtime.remember
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.Dp
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.joysticks.stats.ui.theme.ChalkWhite
-import com.joysticks.stats.ui.theme.FieldGreen
-import com.joysticks.stats.ui.theme.HudBackground
-import com.joysticks.stats.ui.theme.HudBackgroundDeep
-import com.joysticks.stats.ui.theme.HudBorder
-import com.joysticks.stats.ui.theme.HudMuted
-import com.joysticks.stats.ui.theme.HudPanel as HudPanelColor
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
+import coil.compose.SubcomposeAsyncImage
+import coil.request.ImageRequest
+import com.joysticks.stats.data.SettingsDataStore
+import com.joysticks.stats.ui.theme.*
+
+@Composable
+fun PlayerPlaceholder(modifier: Modifier = Modifier) {
+    Canvas(modifier = modifier.fillMaxSize()) {
+        val center = Offset(size.width / 2f, size.height / 2f)
+        val radius = size.minDimension * 0.46f
+        
+        // Tête
+        drawCircle(
+            color = Color(0xFF3B414A),
+            radius = radius * 0.26f,
+            center = Offset(center.x, center.y - radius * 0.22f)
+        )
+        
+        // Épaules
+        drawOval(
+            color = Color(0xFF3B414A),
+            topLeft = Offset(center.x - radius * 0.52f, center.y + radius * 0.12f),
+            size = Size(radius * 1.04f, radius * 0.52f)
+        )
+    }
+}
+
+@Composable
+fun PlayerAvatar(
+    photoUrl: String?,
+    modifier: Modifier = Modifier,
+    borderColor: Color = FieldGreen,
+    showPlaceholder: Boolean = true,
+    playerName: String? = null
+) {
+    val context = LocalContext.current
+    val settingsDataStore = remember { SettingsDataStore(context) }
+    val baseUrl by settingsDataStore.playerImagesUrlFlow.collectAsState(initial = SettingsDataStore.DEFAULT_IMAGES_URL)
+    
+    val trimmedUrl = photoUrl?.trim()
+    val fullUrl = if (!trimmedUrl.isNullOrBlank()) {
+        if (trimmedUrl.startsWith("http")) trimmedUrl else "$baseUrl$trimmedUrl"
+    } else null
+
+    LaunchedEffect(fullUrl) {
+        if (fullUrl != null) {
+            Log.d("PlayerAvatar", "Tentative de chargement pour ${playerName ?: "Inconnu"} : $fullUrl")
+        }
+    }
+    
+    val hasPhoto = !fullUrl.isNullOrBlank()
+
+    Box(
+        modifier = modifier
+            .aspectRatio(1f)
+            .clip(CircleShape)
+            .then(
+                if (hasPhoto || showPlaceholder) 
+                    Modifier.border(2.dp, borderColor.copy(alpha = 0.5f), CircleShape)
+                            .background(Color.Black.copy(alpha = 0.3f))
+                else Modifier
+            ),
+        contentAlignment = Alignment.Center
+    ) {
+        if (hasPhoto) {
+            SubcomposeAsyncImage(
+                model = ImageRequest.Builder(LocalContext.current)
+                    .data(fullUrl)
+                    .crossfade(true)
+                    .build(),
+                loading = { if (showPlaceholder) PlayerPlaceholder() },
+                error = { 
+                    Log.e("PlayerAvatar", "ERREUR 404 ou réseau pour ${playerName ?: "Inconnu"} : $fullUrl")
+                    if (showPlaceholder) PlayerPlaceholder()
+                },
+                contentDescription = "Photo de ${playerName ?: "joueur"}",
+                contentScale = ContentScale.Crop,
+                modifier = Modifier.fillMaxSize()
+            )
+        } else if (showPlaceholder) {
+            PlayerPlaceholder()
+        }
+    }
+}
 
 @Composable
 fun HudPanel(
@@ -52,7 +130,7 @@ fun HudPanel(
     Surface(
         modifier = modifier,
         shape = shape,
-        color = HudPanelColor,
+        color = HudPanel,
         border = BorderStroke(1.dp, borderColor),
         shadowElevation = 10.dp
     ) {
@@ -187,7 +265,7 @@ fun HudButton(
             .clickable(
                 enabled = enabled,
                 interactionSource = interactionSource,
-                    indication = null
+                indication = null
             ) { onClick() }
             .padding(horizontal = 18.dp),
         contentAlignment = Alignment.Center
@@ -197,39 +275,6 @@ fun HudButton(
             fontWeight = FontWeight.ExtraBold,
             color = if (enabled) ChalkWhite else HudMuted
         )
-    }
-}
-
-@Composable
-fun HudScreenChrome(
-    modifier: Modifier = Modifier,
-    content: @Composable () -> Unit
-) {
-    Box(
-        modifier = modifier
-            .fillMaxSize()
-            .background(HudBackgroundDeep)
-    ) {
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .background(
-                    Brush.radialGradient(
-                        colors = listOf(
-                            FieldGreen.copy(alpha = 0.22f),
-                            HudBackground.copy(alpha = 0.82f),
-                            HudBackgroundDeep
-                        ),
-                        radius = 900f
-                    )
-                )
-        )
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .background(Color.Black.copy(alpha = 0.34f))
-        )
-        content()
     }
 }
 
@@ -264,6 +309,193 @@ fun HudTitleBlock(
                 .height(3.dp)
                 .clip(RoundedCornerShape(2.dp))
                 .background(accent)
+        )
+    }
+}
+
+@Composable
+fun HudScreenHeader(
+    title: String,
+    onBack: () -> Unit,
+    modifier: Modifier = Modifier,
+    accent: Color = FieldGreen,
+    actionContent: @Composable (RowScope.() -> Unit)? = null
+) {
+    Row(
+        modifier = modifier.fillMaxWidth(),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        IconButton(
+            onClick = onBack,
+            modifier = Modifier
+                .size(44.dp)
+                .background(HudPanel, RoundedCornerShape(8.dp))
+        ) {
+            Icon(
+                imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                contentDescription = "Retour",
+                tint = ChalkWhite
+            )
+        }
+        Spacer(Modifier.width(16.dp))
+        Column(modifier = Modifier.weight(1f)) {
+            Text(
+                text = title.uppercase(),
+                style = MaterialTheme.typography.headlineMedium,
+                color = ChalkWhite,
+                fontWeight = FontWeight.Black,
+                letterSpacing = 1.sp
+            )
+            Box(
+                Modifier
+                    .width(60.dp)
+                    .height(4.dp)
+                    .background(accent)
+            )
+        }
+        if (actionContent != null) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
+                content = actionContent
+            )
+        }
+    }
+}
+
+@Composable
+fun BaseballScreenTemplate(content: @Composable BoxScope.() -> Unit) {
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(Color.Black)
+    ) {
+        StadiumBackdrop(modifier = Modifier.fillMaxSize())
+
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(Color.Black.copy(alpha = 0.14f))
+        )
+
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(
+                    Brush.radialGradient(
+                        listOf(
+                            FieldGreen.copy(alpha = 0.10f),
+                            Color.Transparent,
+                            Color.Black.copy(alpha = 0.88f)
+                        ),
+                        radius = 1350f
+                    )
+                )
+        )
+
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(horizontal = 24.dp),
+            content = content
+        )
+    }
+}
+
+@Composable
+private fun StadiumBackdrop(modifier: Modifier = Modifier) {
+    Canvas(modifier = modifier) {
+        val w = size.width
+        val h = size.height
+
+        drawRect(
+            Brush.verticalGradient(
+                listOf(
+                    Color(0xFF02050A),
+                    Color(0xFF08110F),
+                    Color(0xFF06110B),
+                    Color(0xFF020403)
+                )
+            )
+        )
+
+        drawOval(
+            brush = Brush.radialGradient(
+                listOf(
+                    Color(0x88376C38),
+                    Color(0x331B2C1F),
+                    Color.Transparent
+                ),
+                center = Offset(w * 0.5f, h * 0.54f),
+                radius = w * 0.56f
+            ),
+            topLeft = Offset(w * 0.06f, h * 0.10f),
+            size = Size(w * 0.88f, h * 0.72f)
+        )
+
+        val home = Offset(w * 0.5f, h * 0.72f)
+        val leftFoul = Offset(w * 0.18f, h * 0.20f)
+        val rightFoul = Offset(w * 0.82f, h * 0.20f)
+
+        val field = Path().apply {
+            moveTo(home.x, home.y)
+            lineTo(leftFoul.x, leftFoul.y)
+            quadraticTo(w * 0.5f, h * 0.05f, rightFoul.x, rightFoul.y)
+            close()
+        }
+        drawPath(
+            path = field,
+            brush = Brush.verticalGradient(
+                listOf(
+                    Color(0x33255B33),
+                    Color(0x66274A28),
+                    Color(0x77172117)
+                )
+            )
+        )
+
+        repeat(8) { index ->
+            val startX = w * (0.18f + index * 0.085f)
+            val stripe = Path().apply {
+                moveTo(startX, h * 0.18f)
+                lineTo(startX + w * 0.16f, h * 0.18f)
+                lineTo(startX - w * 0.08f, h * 0.77f)
+                lineTo(startX - w * 0.24f, h * 0.77f)
+                close()
+            }
+            drawPath(stripe, Color.White.copy(alpha = if (index % 2 == 0) 0.025f else 0.012f))
+        }
+
+        drawLine(Color.White.copy(alpha = 0.13f), home, leftFoul, strokeWidth = 2.5f)
+        drawLine(Color.White.copy(alpha = 0.13f), home, rightFoul, strokeWidth = 2.5f)
+        drawArc(
+            color = Color.White.copy(alpha = 0.08f),
+            startAngle = 205f,
+            sweepAngle = 130f,
+            useCenter = false,
+            topLeft = Offset(w * 0.22f, h * 0.08f),
+            size = Size(w * 0.56f, h * 0.56f),
+            style = Stroke(width = 2f)
+        )
+
+        drawRect(
+            Brush.verticalGradient(
+                listOf(
+                    Color.Black.copy(alpha = 0.88f),
+                    Color.Transparent,
+                    Color.Black.copy(alpha = 0.84f)
+                )
+            )
+        )
+        drawRect(
+            Brush.horizontalGradient(
+                listOf(
+                    Color.Black.copy(alpha = 0.82f),
+                    Color.Transparent,
+                    Color.Transparent,
+                    Color.Black.copy(alpha = 0.82f)
+                )
+            )
         )
     }
 }

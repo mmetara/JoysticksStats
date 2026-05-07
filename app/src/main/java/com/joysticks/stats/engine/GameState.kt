@@ -50,6 +50,52 @@ data class GameState(
         // L'équipe visiteuse frappe toujours au haut de la manche.
         return !isTop
     }
+
+    fun updateHistory(
+        playerIndex: Int,
+        result: BattingResult? = null,
+        finalBase: Int? = null,
+        rbi: Int? = null,
+        retiredOnOptionel: Boolean = false,
+        outNumber: Int = 0
+    ): GameState {
+        val history = gameHistory.toMutableList()
+        val currentInning = inning
+        val isHome = isHomeTeamBatting()
+
+        val index = history.indexOfLast { it.playerIndex == playerIndex && it.inning == currentInning && it.isHomeTeam == isHome }
+
+        if (index != -1) {
+            val oldEvent = history[index]
+            val newResult = if (result != null && !(oldEvent.result == BattingResult.Single || oldEvent.result == BattingResult.Double || oldEvent.result == BattingResult.Triple || oldEvent.result == BattingResult.HomeRun || oldEvent.result == BattingResult.Optionel)) {
+                result
+            } else {
+                oldEvent.result
+            }
+
+            val finalFinalBase = if (finalBase == 0 && oldEvent.finalBase > 0) {
+                // On préserve la base la plus avancée même si le joueur est retiré plus tard
+                oldEvent.finalBase
+            } else {
+                finalBase ?: oldEvent.finalBase
+            }
+
+            val updatedEvent = oldEvent.copy(
+                result = newResult,
+                finalBase = finalFinalBase,
+                rbi = rbi ?: oldEvent.rbi,
+                retiredOnOptionel = retiredOnOptionel || oldEvent.retiredOnOptionel,
+                outNumber = if (outNumber > 0) outNumber else oldEvent.outNumber
+            )
+            history[index] = updatedEvent
+        } else {
+            val defaultResult = result ?: BattingResult.Out
+            val defaultFinalBase = finalBase ?: 0
+            val newEvent = AtBatEvent(playerIndex, currentInning, defaultResult, defaultFinalBase, isHome, rbi ?: 0, retiredOnOptionel, outNumber)
+            history.add(newEvent)
+        }
+        return copy(gameHistory = history)
+    }
 }
 
 data class AtBatEvent(

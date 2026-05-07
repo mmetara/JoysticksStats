@@ -45,6 +45,8 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.Surface
 import androidx.navigation.NavController
 import com.joysticks.stats.engine.GameScreenMode
+import com.joysticks.stats.ui.components.BaseballScreenTemplate
+import com.joysticks.stats.ui.components.HudScreenHeader
 import com.joysticks.stats.ui.navigation.Screen
 import com.joysticks.stats.ui.theme.*
 
@@ -67,34 +69,20 @@ fun StatsSheetScreen(navController: NavController, gameState: GameState, roster:
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(16.dp)
+                .padding(top = 16.dp, bottom = 16.dp)
         ) {
-            // Header Section
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.Bottom
-            ) {
-                Column {
-                    Text(
-                        text = "FEUILLE DE MATCH",
-                        style = MaterialTheme.typography.headlineMedium,
-                        color = ChalkWhite,
-                        fontWeight = FontWeight.Black,
-                        letterSpacing = 1.sp
-                    )
-                    Box(Modifier.width(80.dp).height(4.dp).background(FieldGreen))
-                    
-                    Text(
-                        text = if (isEditingMode) "MODE ÉDITION ACTIF" else "MODE CONSULTATION",
-                        style = MaterialTheme.typography.labelMedium,
-                        color = if (isEditingMode) HudRed else HudMuted,
-                        fontWeight = FontWeight.Bold,
-                        modifier = Modifier.padding(top = 4.dp)
-                    )
-                }
-
-                Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+            HudScreenHeader(
+                title = "FEUILLE DE MATCH",
+                onBack = {
+                    if (gameState.screenMode != GameScreenMode.PRE_GAME) {
+                        navController.navigate(Screen.Game.route) {
+                            popUpTo(Screen.Home.route)
+                        }
+                    } else {
+                        navController.popBackStack()
+                    }
+                },
+                actionContent = {
                     // Edit Toggle Button (HUD Style)
                     Surface(
                         modifier = Modifier.clickable { isEditingMode = !isEditingMode },
@@ -108,22 +96,17 @@ fun StatsSheetScreen(navController: NavController, gameState: GameState, roster:
                             Text(if (isEditingMode) "QUITTER ÉDITION" else "MODIFIER", color = ChalkWhite, fontWeight = FontWeight.Black, fontSize = 12.sp)
                         }
                     }
-
-                    if (gameState.screenMode != GameScreenMode.PRE_GAME) {
-                        Surface(
-                            modifier = Modifier.clickable { navController.navigate(Screen.Game.route) },
-                            color = HudBlue,
-                            shape = RoundedCornerShape(8.dp),
-                            border = borderStroke(1.dp, HudBorder)
-                        ) {
-                            Row(Modifier.padding(horizontal = 16.dp, vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
-                                Icon(Icons.AutoMirrored.Filled.ArrowBack, null, tint = ChalkWhite, modifier = Modifier.size(18.dp))
-                                Spacer(Modifier.width(8.dp))
-                                Text("RETOUR PARTIE", color = ChalkWhite, fontWeight = FontWeight.Black, fontSize = 12.sp)
-                            }
-                        }
-                    }
                 }
+            )
+
+            if (isEditingMode) {
+                Text(
+                    text = "MODE ÉDITION ACTIF",
+                    style = MaterialTheme.typography.labelMedium,
+                    color = HudRed,
+                    fontWeight = FontWeight.Bold,
+                    modifier = Modifier.padding(top = 8.dp, start = 60.dp)
+                )
             }
 
             Spacer(modifier = Modifier.height(20.dp))
